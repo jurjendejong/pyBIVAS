@@ -23,7 +23,7 @@ class pyFIS:
 
         response_geogeneration = self._parse_request('geogeneration')
         self.geogeneration = str(response_geogeneration['GeoGeneration'])
-        logger.INFO(f"Geogeneration: {self.geogeneration} - {response_geogeneration['PublicationDate']}")
+        logger.info(f"Geogeneration: {self.geogeneration} - {response_geogeneration['PublicationDate']}")
 
     def list_geotypes(self):
         """Returns list of all geotypes"""
