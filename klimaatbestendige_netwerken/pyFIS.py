@@ -7,7 +7,8 @@ Jurjen de Jong, Deltares, 24-9-2019
 import requests
 import logging
 from shapely import wkt
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point, Polygon, MultiPolygon
+from shapely.ops import nearest_points
 import geopandas as gpd
 from pathlib import Path
 
@@ -24,6 +25,9 @@ class pyFIS:
         response_geogeneration = self._parse_request('geogeneration')
         self.geogeneration = str(response_geogeneration['GeoGeneration'])
         logger.info(f"Geogeneration: {self.geogeneration} - {response_geogeneration['PublicationDate']}")
+
+        self.service_coordinate_system = 'epsg:4326'
+        self.export_coordinate_system = None  # Set to none to not convert. Otherwise: 'epsg:28992'
 
     def list_geotypes(self):
         """Returns list of all geotypes"""
@@ -109,7 +113,13 @@ class pyFIS:
                     continue
                 else:
                     result = gpd.GeoDataFrame(result)
-                    result['Geometry'] = result['Geometry'].apply(wkt.loads)
+
+                    # Convert data to real geometry data and transform to given coordinate system
+                    result.rename(axis=1, mapper={'Geometry': 'geometry'}, inplace=True)
+                    result['geometry'] = result['geometry'].apply(wkt.loads)
+                    if self.export_coordinate_system:
+                        result.crs = {'init': self.service_coordinate_system}
+                        result.to_crs({'init': self.export_coordinate_system})
                     return result
 
             else:  # Single page response
@@ -123,17 +133,37 @@ class pyFIS:
         return result
 
     def find_object_by_polygon(self, geotype, polygon):
-        # TODO
-        NotImplementedError()
+        if not isinstance(polygon, Polygon) and not isinstance(polygon, MultiPolygon):  # If type is not yet Polygon, make it a polygon
+            polygon = Polygon(polygon)
+        df = self.list_objects(geotype)
+        df = df[df.geometry.within(polygon)]
+        return df
+
 
     def find_closest_object(self, geotype, point):
-        # TODO
-        NotImplementedError()
+        if not isinstance(point, Point):
+            point = Point(point)
 
-    def merge_geotypes(self, left_geotype, right_geotype, left_on=['GeoType', 'Id'],
-                       right_on=['ParentGeoType', 'ParentId']):
+        df = self.list_objects(geotype)
+
+        p, _ = nearest_points(df.unary_union, point)
+        return df[df['geometry'] == p]
+
+    def merge_geotypes(self, left_geotype, right_geotype, left_on=None,
+                       right_on=None):
+
         df_l = self.list_objects(left_geotype)
         df_r = self.list_objects(right_geotype)
+
+        # If join fields are not set, they are assumed:
+        if (not left_on) or (not right_on):
+            if 'ParentGeoType' in df_r.columns:
+                left_on = ['GeoType', 'Id']
+                right_on = ['ParentGeoType', 'ParentId']
+            else:
+                left_on = ['Id']
+                right_on = ['ParentId']
+
         df_merge = df_l.merge(df_r, left_on=left_on, right_on=right_on, suffixes=('', f'_{right_geotype}'))
         return df_merge
 
@@ -157,6 +187,20 @@ class pyFIS:
 
 
 if __name__ == '__main__':
+    # Some test calls
     FIS = pyFIS()
     FIS.list_geotypes()
+    FIS.list_relations('lock')
+    FIS.list_objects('chamber')
+
     FIS.merge_geotypes('bridge', 'opening')
+
+    pol = [(5.774, 51.898),
+           (5.742, 51.813),
+           (6.020, 51.779),
+           (5.951, 51.912),
+           (5.774, 51.898),
+           ]
+    FIS.find_object_by_polygon('bridge', pol)
+    FIS.find_closest_object('bridge', pol[0])
+

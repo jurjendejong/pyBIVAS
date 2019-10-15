@@ -9,6 +9,10 @@ Sphinx==1.8.5
 twine==1.14.0
 pandas==0.25.1
 networkx==2.3
-geopandas==0.4.0
+gdal==2.3.0
+geopandas==0.4.1
 shapely==1.6.4
 numpy==1.16.5
+ipython
+matplotlib
+openpyxl
