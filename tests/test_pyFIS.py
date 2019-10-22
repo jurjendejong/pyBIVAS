@@ -15,8 +15,10 @@ class test_pyFIS(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures, if any."""
         self.FIS = pyFIS()
+        
+    def test_000_print_geogeneration(self):
         print(f'Geogeneration: {self.FIS.geogeneration}, Publication Date: {self.FIS.publication_date}')
-
+    
     def test_000_list_geotypes(self):
         response = self.FIS.list_geotypes()
         assert len(response) > 0, "Loading failed"
