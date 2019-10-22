@@ -419,6 +419,7 @@ class pyBIVAS():
         LEFT JOIN trips_{0} AS trips ON routes.TripID = trips.ID
         LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
         LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+        LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
         WHERE ArcID = {1}
@@ -754,8 +755,7 @@ class pyBIVAS():
         # Validate points passed
         referencestrips['PointPassed'] = np.in1d(
             referencestrips['ArcID'], route['ArcID'])
-        referencestrips['geometry'] = referencestrips['geometry'].representative_point(
-        )
+        referencestrips['geometry'] = referencestrips['geometry'].representative_point()
         return referencestrips
 
     def sql(self, sql):

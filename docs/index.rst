@@ -1,5 +1,5 @@
 Welcome to Klimaatbestendige Netwerken's documentation!
-======================================
+=======================================================
 
 .. toctree::
    :maxdepth: 2
@@ -7,7 +7,7 @@ Welcome to Klimaatbestendige Netwerken's documentation!
 
    readme
    installation
-   usage
+   pyBIVAS
    modules
    contributing
    authors
