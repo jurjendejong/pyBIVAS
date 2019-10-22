@@ -3,16 +3,24 @@
 language: python
 python:
   - 3.7
-  - 3.6
-  - 3.5
-  - 2.7
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
-  - pip install -r requirements_dev.txt
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - source "$HOME/miniconda/etc/profile.d/conda.sh"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  # Useful for debugging any issues with conda
+  - conda info -a
+  
+  - conda create --name kbn python=3.7
+  - conda activate kbn
+  - conda install geopandas requests
+  - pip install tox-travis
   - pip install .
-  - pip install -U tox-travis
-
+  
 # Command to run tests, e.g. python setup.py test
 script: tox
 
