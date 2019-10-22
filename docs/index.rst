@@ -6,12 +6,9 @@ Welcome to Klimaatbestendige Netwerken's documentation!
    :caption: Contents:
 
    readme
-   installation
    pyBIVAS
-   modules
-   contributing
-   authors
-   history
+   pyFIS
+
 
 Indices and tables
 ==================

@@ -24,6 +24,8 @@ class pyFIS:
 
         response_geogeneration = self._parse_request('geogeneration')
         self.geogeneration = str(response_geogeneration['GeoGeneration'])
+        self.publication_date = str(response_geogeneration['PublicationDate'])
+
         logger.info(f"Geogeneration: {self.geogeneration} - {response_geogeneration['PublicationDate']}")
 
         self.service_coordinate_system = 'epsg:4326'

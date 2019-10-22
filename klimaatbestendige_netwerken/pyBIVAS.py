@@ -404,7 +404,7 @@ class pyBIVAS():
 
     def sqlArcDetails(self, arcID):
         """
-        This function requests all vessel passing a specified arc with 
+        This function requests all vessels passing a specified arc with
         various information about those vessels
         """
         sql = """
