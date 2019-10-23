@@ -2,10 +2,6 @@
 Klimaatbestendige Netwerken
 ===========================
 
-
-.. image:: https://img.shields.io/pypi/v/klimaatbestendige_netwerken.svg
-        :target: https://pypi.python.org/pypi/klimaatbestendige_netwerken
-
 .. image:: https://api.travis-ci.com/jurjendejong/klimaatbestendige_netwerken.svg
         :target: https://travis-ci.com/jurjendejong/klimaatbestendige_netwerken
 
