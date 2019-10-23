@@ -1,8 +1,14 @@
 # Config file for automatic testing at travis-ci.org
 
+# Disable sudo to speed up the build
+sudo: false
+
 language: python
 python:
   - 3.7
+
+env:
+  - CODECOV_TOKEN="4e105816-5349-4569-9aee-cd812d58bc87"
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
@@ -21,8 +27,15 @@ install:
   - conda list
   - pip install tox-travis
   - pip install .
+  - pip install coverage
   
-script: python tests/test_pyFIS.py  
+script: 
+  - python tests/test_pyFIS.py  
+  - coverage run tests.py
+
+# Push the results back to codecov
+after_success:
+  - codecov
 
 # Command to run tests, e.g. python setup.py test
 # script: tox
