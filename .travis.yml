@@ -18,6 +18,7 @@ install:
   - conda create --name kbn python=3.7
   - conda activate kbn
   - conda install geopandas requests
+  - conda list
   - pip install tox-travis
   - pip install .
   
