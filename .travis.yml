@@ -21,8 +21,10 @@ install:
   - pip install tox-travis
   - pip install .
   
+script: python tests/test_pyFIS.py  
+
 # Command to run tests, e.g. python setup.py test
-script: tox
+# script: tox
 
 # Assuming you have installed the travis-ci CLI tool, after you
 # create the Github repo and add it to Travis, run the
