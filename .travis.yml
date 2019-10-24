@@ -31,7 +31,7 @@ install:
   
 script: 
   - python tests/test_pyFIS.py  
-  - coverage run tests.py
+  - coverage run tests/test_pyFIS.py 
 
 # Push the results back to codecov
 after_success:
