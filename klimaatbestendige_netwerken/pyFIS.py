@@ -135,6 +135,18 @@ class pyFIS:
         return result
 
     def find_object_by_polygon(self, geotype, polygon):
+        """
+        Find all objects within given polygon
+        Polygon may be of type tuple or shapely Polygon
+        
+        pol = [(5.774, 51.898),
+               (5.742, 51.813),
+               (6.020, 51.779),
+               (5.951, 51.912),
+               (5.774, 51.898),
+               ]
+        find_object_by_polygon('bridge', pol)
+        """
         if not isinstance(polygon, Polygon) and not isinstance(polygon, MultiPolygon):  # If type is not yet Polygon, make it a polygon
             polygon = Polygon(polygon)
         df = self.list_objects(geotype)
@@ -143,6 +155,14 @@ class pyFIS:
 
 
     def find_closest_object(self, geotype, point):
+        """
+        Find object closest to given point
+        Point may be of type tuple or shapely Point
+        
+        point = (5.774, 51.898)
+        find_closest_object('bridge', point)
+        
+        """
         if not isinstance(point, Point):
             point = Point(point)
 
@@ -153,6 +173,11 @@ class pyFIS:
 
     def merge_geotypes(self, left_geotype, right_geotype, left_on=None,
                        right_on=None):
+         """
+         
+         merge_geotypes('bridge', 'opening')
+         
+         """
 
         df_l = self.list_objects(left_geotype)
         df_r = self.list_objects(right_geotype)
@@ -170,6 +195,12 @@ class pyFIS:
         return df_merge
 
     def export_sqlite(self, sqlite_filepath, force=True):
+        """
+        
+        Export entire server to sqlite database
+        Used for backuping.
+        
+        """
         # TODO
         sqlite_filepath = Path(sqlite_filepath)
 

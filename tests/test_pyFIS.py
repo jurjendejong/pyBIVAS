@@ -28,7 +28,9 @@ class test_pyFIS(unittest.TestCase):
         assert len(response) > 0, "Loading failed"
 
     def test_002_list_objects(self):
-        df = self.FIS.list_objects('chamber')
+        self.FIS.list_objects('chamber')
+        self.FIS.list_objects('chamber')
+        df = self.FIS.chamber
         assert df.shape[0] > 0, "Loading failed"
 
     def test_003_merge_geotypes(self):
@@ -50,6 +52,19 @@ class test_pyFIS(unittest.TestCase):
         df = self.FIS.find_closest_object('bridge', point)
         assert df.shape[0] > 0, "Loading failed"
 
+    def test_007_list_all_objects(self):
+        self.FIS.list_all_objects()
+        self.FIS.chamber
+        
+    def test_008_get_object(self):
+        df = self.FIS.get_object('bridge', 2123)
+        assert df.shape[0] > 0, "Loading failed"
+        
+    def test_009_get_object_subobjects(self):
+        df = self.FIS.get_object_subobjects('bridge', 1217, 'opening')
+        assert df.shape[0] > 0, "Loading failed"
+        
+        
 
 if __name__ == '__main__':
     unittest.main()

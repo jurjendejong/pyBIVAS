@@ -24,13 +24,13 @@ install:
   - conda create --name kbn python=3.7
   - conda activate kbn
   - conda install geopandas requests
-  - conda list
-  - pip install tox-travis
-  - pip install .
   - pip install coverage codecov
+  - pip install .
+  - conda list
   
 script: 
   - coverage run tests/test_pyFIS.py 
+  - coverage report -m
 
 # Push the results back to codecov
 after_success:
