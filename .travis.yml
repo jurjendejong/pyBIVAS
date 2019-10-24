@@ -27,7 +27,7 @@ install:
   - conda list
   - pip install tox-travis
   - pip install .
-  - pip install coverage codecov
+  - pip install coverage
   
 script: 
   - coverage run -m tests/test_pyFIS.py 
