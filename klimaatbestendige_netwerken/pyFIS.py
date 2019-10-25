@@ -63,7 +63,7 @@ class pyFIS:
         Load all objects of all geotypes
         """
         for geotype in self.list_geotypes():
-            self.list_objects(self, geotype)
+            self.list_objects(geotype)
 
     def get_object(self, geotype, objectid):
         """
