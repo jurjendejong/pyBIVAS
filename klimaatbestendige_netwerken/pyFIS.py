@@ -62,7 +62,7 @@ class pyFIS:
         """
         Load all objects of all geotypes
         """
-        for geotype in self.list_geotype():
+        for geotype in self.list_geotypes():
             self.list_objects(self, geotype)
 
     def get_object(self, geotype, objectid):
@@ -73,6 +73,7 @@ class pyFIS:
         return: objectdetails
         
         """
+        objectid = str(objectid)
         return self._parse_request([self.geogeneration, geotype, objectid])
 
     def get_object_subobjects(self, geotype, objectid, geotype2):
@@ -83,7 +84,7 @@ class pyFIS:
         return: [openingid#1, openingid#2, ...]
         
         """
-
+        objectid = str(objectid)
         return self._parse_request([self.geogeneration, geotype, objectid, geotype2])
 
     def _parse_request(self, components):

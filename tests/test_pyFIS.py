@@ -54,7 +54,8 @@ class test_pyFIS(unittest.TestCase):
 
     def test_007_list_all_objects(self):
         self.FIS.list_all_objects()
-        self.FIS.chamber
+        df = self.FIS.chamber
+        assert df.shape[0] > 0, "Loading failed"
         
     def test_008_get_object(self):
         df = self.FIS.get_object('bridge', 2123)
