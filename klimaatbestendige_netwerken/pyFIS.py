@@ -173,11 +173,12 @@ class pyFIS:
 
     def merge_geotypes(self, left_geotype, right_geotype, left_on=None,
                        right_on=None):
-         """
-         
-         merge_geotypes('bridge', 'opening')
-         
-         """
+        """
+        Load two geotypes and apply inner join.
+
+        merge_geotypes('bridge', 'opening')
+
+        """
 
         df_l = self.list_objects(left_geotype)
         df_r = self.list_objects(right_geotype)
