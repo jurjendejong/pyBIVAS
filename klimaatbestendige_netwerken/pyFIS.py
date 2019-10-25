@@ -249,7 +249,7 @@ class pyFIS:
                 logger.debug(f'Writing: {geotype}')
                 df = self.list_objects(geotype)
                 sheet_name = geotype[:31]
-                df.to_excel(writer, sheet_name=sheet_name)
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
             logger.debug(f'Saving excel')
             writer.save()
         else:

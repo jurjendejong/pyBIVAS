@@ -29,7 +29,7 @@ install:
     - conda list
   
 script:
-    - coverage run -m unittest discover
+    - coverage run -m unittest discover -v
 #  - coverage run --source=klimaatbestendige_netwerken tests/test_pyFIS.py
     - coverage report -m
 
