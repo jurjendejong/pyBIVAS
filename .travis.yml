@@ -5,37 +5,37 @@ sudo: false
 
 language: python
 python:
-  - 3.7
+    - 3.7
 
 env:
-  - CODECOV_TOKEN="4e105816-5349-4569-9aee-cd812d58bc87"
+    - CODECOV_TOKEN="4e105816-5349-4569-9aee-cd812d58bc87"
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - source "$HOME/miniconda/etc/profile.d/conda.sh"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
-  - conda info -a
-  
-  - conda create --name kbn python=3.7
-  - conda activate kbn
-  - conda install geopandas requests
-  # - pip install coverage codecov
-  - pip install .
-  - conda list
+    - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - source "$HOME/miniconda/etc/profile.d/conda.sh"
+    - hash -r
+    - conda config --set always_yes yes --set changeps1 no
+    - conda update -q conda
+    # Useful for debugging any issues with conda
+    - conda info -a
+
+    - conda create --name kbn python=3.7
+    - conda activate kbn
+    - conda install geopandas requests
+    - pip install coverage codecov
+    - pip install .
+    - conda list
   
 script:
-    - python -m unittest discover
+    - coverage run -m unittest discover
 #  - coverage run --source=klimaatbestendige_netwerken tests/test_pyFIS.py
-#  - coverage report -m
+    - coverage report -m
 
 # Push the results back to codecov
-# after_success:
-  # - codecov
+after_success:
+    - codecov
 
 # Command to run tests, e.g. python setup.py test
 # script: tox
