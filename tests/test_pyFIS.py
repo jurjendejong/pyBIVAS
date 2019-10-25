@@ -6,7 +6,7 @@
 
 import unittest
 
-from klimaatbestendige_netwerken.pyFIS import pyFIS
+from klimaatbestendige_netwerken import pyFIS
 
 
 class test_pyFIS(unittest.TestCase):
@@ -14,7 +14,7 @@ class test_pyFIS(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures, if any."""
-        self.FIS = pyFIS()
+        self.FIS = pyFIS.pyFIS()
         
     def test_000_print_geogeneration(self):
         print(f'Geogeneration: {self.FIS.geogeneration}, Publication Date: {self.FIS.publication_date}')
@@ -52,19 +52,19 @@ class test_pyFIS(unittest.TestCase):
         df = self.FIS.find_closest_object('bridge', point)
         assert df.shape[0] > 0, "Loading failed"
 
+    # Disabled because this test is too slow
     def test_007_list_all_objects(self):
         self.FIS.list_all_objects()
         df = self.FIS.chamber
         assert df.shape[0] > 0, "Loading failed"
         
     def test_008_get_object(self):
-        df = self.FIS.get_object('bridge', 2123)
+        df = self.FIS.get_object('bridge', 1667)
         assert df.shape[0] > 0, "Loading failed"
         
     def test_009_get_object_subobjects(self):
-        df = self.FIS.get_object_subobjects('bridge', 1217, 'opening')
+        df = self.FIS.get_object_subobjects('bridge', 1667, 'opening')
         assert df.shape[0] > 0, "Loading failed"
-        
         
 
 if __name__ == '__main__':
