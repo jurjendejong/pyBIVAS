@@ -5,8 +5,12 @@
 
 
 import unittest
+import logging
+from pathlib import Path
 
 from klimaatbestendige_netwerken import pyFIS
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 class test_pyFIS(unittest.TestCase):
@@ -16,16 +20,16 @@ class test_pyFIS(unittest.TestCase):
         """Set up test fixtures, if any."""
         self.FIS = pyFIS.pyFIS()
         
-    def test_000_print_geogeneration(self):
+    def test_print_geogeneration(self):
         print(f'Geogeneration: {self.FIS.geogeneration}, Publication Date: {self.FIS.publication_date}')
     
     def test_000_list_geotypes(self):
-        response = self.FIS.list_geotypes()
-        assert len(response) > 0, "Loading failed"
+        list_geotypes = self.FIS.list_geotypes()
+        assert len(list_geotypes) > 0, "Loading failed"
 
     def test_001_list_relations(self):
-        response = self.FIS.list_relations('lock')
-        assert len(response) > 0, "Loading failed"
+        list_relations = self.FIS.list_relations('lock')
+        assert len(list_relations) > 0, "Loading failed"
 
     def test_002_list_objects(self):
         self.FIS.list_objects('chamber')
@@ -52,20 +56,25 @@ class test_pyFIS(unittest.TestCase):
         df = self.FIS.find_closest_object('bridge', point)
         assert df.shape[0] > 0, "Loading failed"
 
-    # Disabled because this test is too slow
-    def test_007_list_all_objects(self):
-        self.FIS.list_all_objects()
-        df = self.FIS.chamber
-        assert df.shape[0] > 0, "Loading failed"
-        
+    # # Disabled because this test is too slow
+    # def test_007_list_all_objects(self):
+    #     self.FIS.list_all_objects()
+    #     filepath = Path(f'Export_geogeneration_{self.FIS.geogeneration}.xlsx')
+    #     self.FIS.export(filepath=filepath)
+    #     self.assertTrue(filepath.is_file())
+
     def test_008_get_object(self):
         df = self.FIS.get_object('bridge', 1667)
+        self.assertGreater(df.shape[0], 0, "Loading failed")
+
+    def test_008_get_object2(self):
+        df = self.FIS.get_object('section', 24774125)
         assert df.shape[0] > 0, "Loading failed"
         
     def test_009_get_object_subobjects(self):
-        df = self.FIS.get_object_subobjects('bridge', 1667, 'opening')
-        assert df.shape[0] > 0, "Loading failed"
-        
+        list_openings = self.FIS.get_object_subobjects('bridge', 1667, 'opening')
+        assert len(list_openings) > 0, "Loading failed"
+
 
 if __name__ == '__main__':
     unittest.main()

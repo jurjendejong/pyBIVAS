@@ -11,9 +11,12 @@ from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.ops import nearest_points
 import geopandas as gpd
 from pathlib import Path
+import pandas as pd
+import sqlite3
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 class pyFIS:
@@ -99,35 +102,53 @@ class pyFIS:
 
         logger.info('Reading: {}'.format(', '.join(components)))
 
+        # Request loop
         result = []
         offset = 0
 
         while True:
-            response = requests.get(url + f'?offset={offset}&count={self.count}')
+            url_page = url + f'?offset={offset}&count={self.count}'
+            logger.debug(f'Requesting: {url_page}')
+            response = requests.get(url_page)
             assert response, f'An error has occured. URL: {url}. Response: {response}'
 
             response_dict = response.json()
 
-            if 'Result' in response_dict:  # Multi page response
+            if 'Result' in response_dict:
+                # Multi page response
                 result.extend(response_dict['Result'])
 
                 if response_dict['Offset'] + response_dict['Count'] < response_dict['TotalCount']:
+                    # Go to next page
                     offset += self.count
-                    continue
                 else:
+                    # Arrived on the final page
                     result = gpd.GeoDataFrame(result)
+                    break
+            else:
+                # Single page. Looping not required
 
-                    # Convert data to real geometry data and transform to given coordinate system
-                    result.rename(axis=1, mapper={'Geometry': 'geometry'}, inplace=True)
-                    result['geometry'] = result['geometry'].apply(wkt.loads)
-                    if self.export_coordinate_system:
-                        result.crs = {'init': self.service_coordinate_system}
-                        result.to_crs({'init': self.export_coordinate_system})
-                    return result
+                # When requesting single object, this should also be handles as a single multi-page response
+                if 'Geometry' in response_dict:
+                    result = gpd.GeoDataFrame([response_dict])
+                else:
+                    # Result is the dict itself
+                    result = response_dict
+                break
 
-            else:  # Single page response
-                result = response_dict
-                return result
+        # Process the requested data
+
+        if 'Geometry' in result:
+            # Convert data to real geometry data and transform to given coordinate system
+            result.rename(axis=1, mapper={'Geometry': 'geometry'}, inplace=True)
+            try:
+                result['geometry'] = result['geometry'].apply(wkt.loads)
+                if self.export_coordinate_system:
+                    result.crs = {'init': self.service_coordinate_system}
+                    result.to_crs({'init': self.export_coordinate_system})
+            except:
+                logger.warning('Could not convert geometry according to WKT format')
+        return result
 
     def find_object_by_value(self, geotype, fieldvalue, fieldname='Name'):
         list_objects = self.list_objects(geotype)
@@ -148,12 +169,12 @@ class pyFIS:
                ]
         find_object_by_polygon('bridge', pol)
         """
-        if not isinstance(polygon, Polygon) and not isinstance(polygon, MultiPolygon):  # If type is not yet Polygon, make it a polygon
+        if not isinstance(polygon, Polygon) and \
+           not isinstance(polygon, MultiPolygon):  # If type is not yet Polygon, make it a polygon
             polygon = Polygon(polygon)
         df = self.list_objects(geotype)
         df = df[df.geometry.within(polygon)]
         return df
-
 
     def find_closest_object(self, geotype, point):
         """
@@ -196,29 +217,44 @@ class pyFIS:
         df_merge = df_l.merge(df_r, left_on=left_on, right_on=right_on, suffixes=('', f'_{right_geotype}'))
         return df_merge
 
-    def export_sqlite(self, sqlite_filepath, force=True):
+    def export(self, filepath, filetype=None, force=True):
         """
         
-        Export entire server to sqlite database
+        Export entire server to excel or sqlite database
         Used for backuping.
+
+        filetype = [None, xlsx]
+        if None, the filepath should end with filetype extension
         
         """
-        # TODO
-        sqlite_filepath = Path(sqlite_filepath)
+        # TODO: implement sqlite
+        filepath = Path(filepath)
+        if not filetype:
+            filetype = filepath.suffix[1:]
 
-        if sqlite_filepath.exists():
+        if filepath.exists():
             if not force:
                 FileExistsError()
             else:
-                sqlite_filepath.unlink()
+                filepath.unlink()
 
         self.list_all_objects()
 
-        for geotype in self.list_geotype():
-            # Save to database
-            pass
+        if filetype in ['xlsx', 'xls']:
+            logger.debug('Writing to excel')
+            # Write to excel
+            writer = pd.ExcelWriter(filepath, engine='xlsxwriter')
 
-        NotImplementedError()
+            for geotype in self.list_geotypes():
+                logger.debug(f'Writing: {geotype}')
+                df = self.list_objects(geotype)
+                sheet_name = geotype[:31]
+                df.to_excel(writer, sheet_name=sheet_name)
+            logger.debug(f'Saving excel')
+            writer.save()
+        else:
+            logger.error(f'Unrecognised filetype: {filetype}')
+            NotImplementedError('Unrecognised filetype')
 
 
 if __name__ == '__main__':
@@ -238,4 +274,3 @@ if __name__ == '__main__':
            ]
     FIS.find_object_by_polygon('bridge', pol)
     FIS.find_closest_object('bridge', pol[0])
-
