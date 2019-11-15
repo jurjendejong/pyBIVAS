@@ -12,7 +12,7 @@ import sqlite3
 import numpy as np
 
 
-class pyBIVAS():
+class pyBIVAS:
     """
     This class helps in postprocessing BIVAS data
     """
@@ -410,9 +410,12 @@ class pyBIVAS():
         sql = """
         SELECT trips.*,
                routes.OriginalArcDirection,
+               routeStats.*,
                ship_types.Label,
                ship_types.Description,
-               nstr_types.Description AS nstr_description,
+               cemt_class.ID,
+               cemt_class.Description,
+               nstr_types.Description,
                appearance_types.Description AS appear_description,
                dangerous_goods_levels.Description AS dangerous_description
         FROM routes_{0} AS routes
@@ -422,6 +425,7 @@ class pyBIVAS():
         LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
+        LEFT JOIN route_statistics_{0} AS routeStats ON routeStats.TripID = routes.TripID
         WHERE ArcID = {1}
         """.format(self.scenarioID, arcID)
 
