@@ -41,6 +41,10 @@ class test_pyFIS(unittest.TestCase):
         df = self.FIS.merge_geotypes('bridge', 'opening')
         assert df.shape[0] > 0, "Loading failed"
 
+    def test_003_merge_geotypes2(self):
+        df = self.FIS.merge_geotypes('lock', 'chamber')
+        assert df.shape[0] > 0, "Loading failed"
+
     def test_004_find_by_polygon(self):
         pol = [(5.774, 51.898),
                (5.742, 51.813),
@@ -74,6 +78,10 @@ class test_pyFIS(unittest.TestCase):
     def test_009_get_object_subobjects(self):
         list_openings = self.FIS.get_object_subobjects('bridge', 1667, 'opening')
         assert len(list_openings) > 0, "Loading failed"
+
+    def test_010_find_object_by_value(self):
+        df = self.FIS.find_object_by_value('bridge', 'Spoorbrug HRMK')
+        assert df.shape[0] > 0, "Loading failed"
 
 
 if __name__ == '__main__':
