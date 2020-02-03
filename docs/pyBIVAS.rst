@@ -66,9 +66,10 @@ Arc Details
 
 Generate output of the trips on a specific location::
 
-    arcID = 6332
-    df = BIVAS.arcUsage(arcID)  # Statistics (number of trips, total weight, average cost/km) based on ArcStatistics tabel
 
+    df = BIVAS.arcUsage()  # Statistics (number of trips, total weight, average cost/km) based on ArcStatistics tabel
+
+    arcID = 6332
     df = BIVAS.sqlArcRouteStatistics(arcID)  # More statistics based on routes table
 
     df = BIVAS.sqlArcDetails(arcID)  # list of trips (with details) on given arc
@@ -93,7 +94,7 @@ For a given routeID, the choosen route and referencesetID, validate if it passed
 
     routeID = 123
     route = BIVAS.sqlRoute(routeID)
-    df = sqlReferenceRoute(routeID, route, ReferenceSetID=3)
+    df = BIVAS.sqlReferenceRoute(routeID, route, ReferenceSetID=3)
 
 Water scenario
 **************

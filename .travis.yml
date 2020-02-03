@@ -23,7 +23,7 @@ install:
 
     - conda create --name kbn python=3.7
     - conda activate kbn
-    - conda install geopandas requests
+    - conda install geopandas requests networkx
     - pip install coverage codecov
     - pip install .
     - conda list

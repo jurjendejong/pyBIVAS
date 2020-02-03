@@ -16,13 +16,15 @@ logging.basicConfig(level=logging.DEBUG)
 class test_pyFIS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
 
+    skipSlowRuns = True
+
     def setUp(self):
         """Set up test fixtures, if any."""
         self.FIS = pyFIS.pyFIS()
-        
+
     def test_print_geogeneration(self):
         print(f'Geogeneration: {self.FIS.geogeneration}, Publication Date: {self.FIS.publication_date}')
-    
+
     def test_000_list_geotypes(self):
         list_geotypes = self.FIS.list_geotypes()
         assert len(list_geotypes) > 0, "Loading failed"
@@ -60,12 +62,13 @@ class test_pyFIS(unittest.TestCase):
         df = self.FIS.find_closest_object('bridge', point)
         assert df.shape[0] > 0, "Loading failed"
 
-    # # Disabled because this test is too slow
-    # def test_007_list_all_objects(self):
-    #     self.FIS.list_all_objects()
-    #     filepath = Path(f'Export_geogeneration_{self.FIS.geogeneration}.xlsx')
-    #     self.FIS.export(filepath=filepath)
-    #     self.assertTrue(filepath.is_file())
+    def test_007_list_all_objects(self):
+        if self.skipSlowRuns:
+            return
+        self.FIS.list_all_objects()
+        filepath = Path(f'Export_geogeneration_{self.FIS.geogeneration}.xlsx')
+        self.FIS.export(filepath=filepath)
+        self.assertTrue(filepath.is_file())
 
     def test_008_get_object(self):
         df = self.FIS.get_object('bridge', 1667)
@@ -74,7 +77,7 @@ class test_pyFIS(unittest.TestCase):
     def test_008_get_object2(self):
         df = self.FIS.get_object('section', 24774125)
         assert df.shape[0] > 0, "Loading failed"
-        
+
     def test_009_get_object_subobjects(self):
         list_openings = self.FIS.get_object_subobjects('bridge', 1667, 'opening')
         assert len(list_openings) > 0, "Loading failed"

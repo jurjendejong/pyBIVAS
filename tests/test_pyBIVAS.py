@@ -73,14 +73,14 @@ class test_pyBIVAS(unittest.TestCase):
         self.BIVAS.sqlRouteStats(self.routeID)  # Stats based on table route_statistics
 
     def test_sqlRoute(self):
-        self.BIVAS.arcs()  # Required to have the arcs available
+        self.BIVAS.sqlArcs()  # Required to have the arcs available
         df = self.BIVAS.sqlRoute(self.routeID)  # Get all arcs that have been passed by route
 
     def test_sqlRouteStatisticsForListTrips(self):
         df = self.BIVAS.sqlRouteStatisticsForListTrips(self.routeIDs)  # Statistics based on trips
 
     def test_sqlReferenceRoute(self):
-        self.BIVAS.arcs()
+        self.BIVAS.sqlArcs()
         route = self.BIVAS.sqlRoute(self.routeID)
         df = self.BIVAS.sqlReferenceRoute(self.routeID, route, ReferenceSetID=3)
 

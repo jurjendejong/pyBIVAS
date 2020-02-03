@@ -6,10 +6,18 @@ Created on Sat Aug 26 14:01:43 2017
 """
 import pandas as pd
 import networkx as nx
-import geopandas
-from shapely.geometry import Point, LineString
 import sqlite3
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+try:
+    import geopandas
+    from shapely.geometry import Point, LineString
+except:
+    logger.warning('Loading of geopandas/shapely failed. Geometric functions will not work')
 
 
 class pyBIVAS:
@@ -292,7 +300,7 @@ class pyBIVAS:
     def sqlAdvancedRoutes(self, group_by=['Vorm', 'NSTR']):
         """
         Advanced query for requesting all results in combinations of groupable parameters. The following groupings are possible:
-        
+
         - TripsID: Generate statistics for all individual trips
         - Days: Generate output on daily frequency
         - NSTR: Classification of loads
@@ -483,12 +491,12 @@ class pyBIVAS:
 
         return df
 
-    def sqlRouteStatisticsForListTrips(self, tripsArray):
+    def sqlRouteStatisticsForListTrips(self, tripsArray: list):
         """
         Get route statistics for an array of given trips
         """
 
-        listOfTrips = ",".join(tripsArray.astype(str))
+        listOfTrips = ",".join(str(t) for t in tripsArray)
 
         sql = """
         SELECT trips.ID,
@@ -511,7 +519,7 @@ class pyBIVAS:
 
     def arcUsage(self):
         sql = """
-        SELECT ArcID, 
+        SELECT ArcID,
         SUM(arcStats.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
         SUM(arcStats.NumberOfTrips * arcStats.AverageLoadWeight__t) AS "Totale Vracht (ton)",
         SUM(arcStats.AverageCosts__Eur / arcStats.AverageDistance__km) AS "Gemiddelde kosten/km"
@@ -662,7 +670,7 @@ class pyBIVAS:
         arcsgpd = geopandas.GeoDataFrame(arcs)
 
         if outputfileshape:
-            arcsgpd.to_file(outputfileshape)
+            arcsgpd.reset_index().to_file(outputfileshape)
 
         self.arcs = arcsgpd
         return self.arcs
