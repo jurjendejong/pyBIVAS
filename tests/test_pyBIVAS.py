@@ -5,8 +5,10 @@
 
 
 import unittest
-
+from pathlib import Path
 from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
+import urllib
+import shutil
 
 
 class test_pyBIVAS(unittest.TestCase):
@@ -14,7 +16,8 @@ class test_pyBIVAS(unittest.TestCase):
 
     skipSlowRuns=True
 
-    database_file = r'p:\11203735-verzilting_2019\002_Effectmodules\01_Scheepvaart\03_BIVAS\BIVAS_finished\bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db'
+    database_file = Path('bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db')
+    database_url = 'ftp://kbn:geieA8=@ftp.deltares.nl/test/bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db'
 
     arcID = 6332
     arcIDs = [6332, 9204, 8886]
@@ -27,21 +30,31 @@ class test_pyBIVAS(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures, if any."""
+
+        # Download external file if missing
+        if not self.database_file.exists():
+            with urllib.request.urlopen(self.database_url) as fin:
+                with open(self.database_file, 'wb') as fout:
+                    shutil.copyfileobj(fin, fout)\
+        # Connect to database
         self.BIVAS = pyBIVAS(self.database_file)
         self.BIVAS.set_scenario(47)
 
     def test_overviewScenarios(self):
         df = self.BIVAS.sqlOverviewOfScenarios()
-        assert df.shape[0] > 0, "Loading failed"
+        print(df)
 
     def test_sqlCountTripsInTrafficScenario(self):
         df = self.BIVAS.sqlCountTripsInTrafficScenario()
+        print(df)
 
     def test_sqlCountTrips(self):
         df = self.BIVAS.sqlCountTrips()
+        print(df)
 
     def test_sqlRouteStatistics(self):
         df = self.BIVAS.sqlRouteStatistics()  # Results (costs, time, distance) per day
+        print(df)
 
     def test_sqlAdvancedRoutes(self):
         # Data results grouped by year (should be identical to self.BIVAS.sqlRouteStatistics() )
