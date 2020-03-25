@@ -6,7 +6,7 @@
 import unittest
 from pathlib import Path
 from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
-
+import shutil
 
 class test_pyBIVAS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
@@ -24,6 +24,8 @@ class test_pyBIVAS(unittest.TestCase):
     # Route from Nijmegen to the Lek
     startNode = 6852
     endNode = 6248
+
+    exportdir = Path('export_pyBIVAS')
 
     def setUp(self):
         # Test if database exists
@@ -115,7 +117,7 @@ class test_pyBIVAS(unittest.TestCase):
         print(df.head(10).to_string())
 
     def test_export_BIVAS_arcs(self):
-        arcs = self.BIVAS.sqlArcs(outputfileshape='arcs.shp', outputfilecsv='arcs.csv')
+        arcs = self.BIVAS.sqlArcs(outputfileshape=self.exportdir / 'arcs.shp', outputfilecsv=self.exportdir / 'arcs.csv')
         print(arcs.head(10).to_string())
 
     def test_findPathInNetworkx(self):

@@ -40,6 +40,25 @@ class pyBIVAS:
         9: '9 - Goederen'
     }
 
+    appeareance_rename = {
+        'Overig': 'Leeg'
+    }
+
+    # Warning: The TEU are not corrected for the number of trips prior to BIVAS 4.8.
+    # Therefor 'Totale TEU' is only valid for BIVAS 4.8 and above
+    compute_route_statistics = """
+        SUM(trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
+        SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
+        SUM(trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
+        SUM(route_statistics.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
+        SUM(route_statistics.VariableCosts__Eur  * trips.NumberOfTrips) + SUM(route_statistics.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
+        SUM(route_statistics.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
+        SUM(route_statistics.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
+        SUM(route_statistics.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
+        SUM((trips.TotalWeight__t * route_statistics.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
+    """
+
+
     def __init__(self, databasefile=None):
         """
         Initialise class
@@ -69,12 +88,12 @@ class pyBIVAS:
         """
         Connect to sqlite3 databasefile (.db)
         """
-        print('Loading database: {}'.format(databasefile))
+        logger.info('Loading database: {}'.format(databasefile))
         self.databasefile = databasefile
         self.connection = sqlite3.connect(self.databasefile)
         return self.connection
 
-    def set_scenario(self, scenario):
+    def set_scenario(self, scenario=None):
         """
         Set scenario to perform analysis
         An int will be assumed to be the id
@@ -89,6 +108,10 @@ class pyBIVAS:
         elif isinstance(scenario, str):
             self.scenarioName = scenario
             self.scenarioID = scenarioOverview[scenarioOverview['Name'] == self.scenarioName].index[0]
+        else:
+            self.scenarioID = scenarioOverview[scenarioOverview['Locked'] == 1].index[0]
+            self.scenarioName = scenarioOverview.loc[self.scenarioID, 'Name']
+            logger.info(f'ScenarioID not given. Assuming scenario: {self.scenarioID} - {self.scenarioName}')
 
         self.trafficScenario = scenarioOverview.loc[self.scenarioID,
                                                     'TrafficScenarioID']
@@ -109,14 +132,33 @@ class pyBIVAS:
         df = df.set_index('ID')
         return df
 
+
+    def sqlAppearanceTypes(self, rename_to_Leeg=True):
+        sql = """SELECT * FROM appearance_types ORDER BY Id"""
+        appearance_types = self.sql(sql).set_index('ID')
+        if rename_to_Leeg:
+            appearance_types.replace({'Description': self.appeareance_rename}, inplace=True)
+        return appearance_types
+
+    def sqlCEMTclass(self):
+        sql = """SELECT * FROM cemt_class ORDER BY Id"""
+        cemt_class = self.sql(sql).set_index('Id')
+        return cemt_class
+
+    def sqlShipTypes(self):
+        sql = """SELECT ship_types.*, cemt_class.Description FROM ship_types LEFT JOIN cemt_class ON CEMTTypeID=cemt_class.ID ORDER BY CEMTTypeID, Id"""
+        ship_types = self.sql(sql).set_index('ID')
+        return ship_types
+
     def sqlCountTripsPerTrafficScenario(self):
         """Count trips per traffic scenario"""
         sql = """
-        SELECT traffic_scenarios.Description, count(*)
+        SELECT traffic_scenarios.ID, traffic_scenarios.Description, count(*)
         FROM trips
         LEFT JOIN traffic_scenarios ON TrafficScenarioID = traffic_scenarios.ID
         GROUP BY TrafficScenarioID"""
         df = pd.read_sql(sql, self.connection)
+        df.set_index('ID', inplace=True)
         return df
 
     def sqlCountTripsInTrafficScenario(self):
@@ -179,7 +221,7 @@ class pyBIVAS:
                trips.ID AS "ID",
                (trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
                (trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
-               (trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)"
+               (trips.TwentyFeetEquivalentUnits) AS "Totale TEU (-)"
         FROM infeasible_trips
         LEFT JOIN trips_{0} AS trips ON infeasible_trips.TripID = trips.ID
         LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
@@ -371,24 +413,15 @@ class pyBIVAS:
         if not sql_where:
             sql_where = '1'
 
-        sql = """
+        sql = f"""
         SELECT {sql_select}
-               SUM(trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
-               SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
-               SUM(trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
-               SUM(route.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
-               SUM(route.VariableCosts__Eur  * trips.NumberOfTrips) + SUM(route.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
-               SUM(route.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
-               SUM(route.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
-               SUM(route.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
-               SUM((trips.TotalWeight__t * route.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
-        FROM route_statistics_{id} AS route
-        LEFT JOIN trips_{id} AS trips ON route.TripID = trips.ID
+               {self.compute_route_statistics}
+        FROM route_statistics_{self.scenarioID} AS route_statistics
+        LEFT JOIN trips_{self.scenarioID} AS trips ON route_statistics.TripID = trips.ID
         {sql_leftjoin}
         WHERE {sql_where}
         GROUP BY {sql_groupby}
-        """.format(id=self.scenarioID, sql_select=sql_select, sql_leftjoin=sql_leftjoin, sql_where=sql_where,
-                   sql_groupby=sql_groupby)
+        """
 
         df = pd.read_sql(sql, self.connection)
 
@@ -410,34 +443,49 @@ class pyBIVAS:
             df = df.set_index(group_by).sort_index()
         return df
 
-    def sqlArcDetails(self, arcID):
+    def sqlArcDetails(self, arcID, extended=True):
         """
         This function requests all vessels passing a specified arc with
         various information about those vessels
         """
-        sql = """
-        SELECT trips.*,
-               routes.OriginalArcDirection,
-               routeStats.*,
-               ship_types.Label,
-               ship_types.Description,
-               cemt_class.ID,
-               cemt_class.Description,
-               nstr_types.Description,
-               appearance_types.Description AS appear_description,
-               dangerous_goods_levels.Description AS dangerous_description
-        FROM routes_{0} AS routes
-        LEFT JOIN trips_{0} AS trips ON routes.TripID = trips.ID
-        LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
-        LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
-        LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
-        LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
-        LEFT JOIN route_statistics_{0} AS routeStats ON routeStats.TripID = routes.TripID
-        WHERE ArcID = {1}
-        """.format(self.scenarioID, arcID)
+        if extended:
+            sql = f"""
+            SELECT trips.*,
+                   routes.OriginalArcDirection,
+                   route_statistics.*,
+                   ship_types.Label AS ship_types_Label,
+                   ship_types.Description AS ship_types_Description,
+                   cemt_class.ID AS cemt_class_ID,
+                   cemt_class.Description AS cemt_class_Description,
+                   nstr_types.Code AS nstr_Short,
+                   nstr_types.Description AS nstr_Description,
+                   appearance_types.Description AS appearance_types_Description,
+                   dangerous_goods_levels.Description AS dangerous_goods_levels_Description,
+                   {self.compute_route_statistics}
+            FROM routes_{self.scenarioID} AS routes
+            LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
+            LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+            LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+            LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+            LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
+            LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
+            LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
+            LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
+            WHERE ArcID = {arcID}
+            GROUP BY trips.ID
+            """
+        else:
+            sql = """
+            SELECT routes.*
+            FROM routes_{0} AS routes
+            WHERE ArcID = {1}
+            """.format(self.scenarioID, arcID)
 
         df = pd.read_sql(sql, self.connection)
+
+        df = df.replace({'nstr_Short': self.NSTR_shortnames})
+        df = df.replace({'appearance_types_Description': self.appeareance_rename})
+
         df = df.set_index('ID')
         df['DateTime'] = pd.to_datetime(df['DateTime'])
         df = df.drop(['SeasonID', 'ShipTypeID', 'DangerousGoodsLevelID', 'LoadTypeID'], axis=1)
@@ -447,22 +495,17 @@ class pyBIVAS:
         """
         Compute route statistics for a specific ArcID
         """
-        sql = """
+        sql = f"""
         SELECT trips.ID,
                (trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
                (trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
                (trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
-               (routeStats.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
-               (routeStats.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
-               (routeStats.VariableCosts__Eur  * trips.NumberOfTrips) + (routeStats.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
-               (routeStats.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
-               (routeStats.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
-               ((trips.TotalWeight__t * routeStats.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
-        FROM routes_{0} AS routes
-        LEFT JOIN trips_{0} AS trips ON routes.TripID = trips.ID
-        LEFT JOIN route_statistics_{0} AS routeStats ON routeStats.TripID = routes.TripID
-        WHERE ArcID = {1}
-        """.format(self.scenarioID, arcID)
+               {self.compute_route_statistics}
+        FROM routes_{self.scenarioID} AS routes
+        LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
+        LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
+        WHERE ArcID = {arcID}
+        """
 
         df = self.sql(sql)
         df = df.set_index('ID')
@@ -770,6 +813,43 @@ class pyBIVAS:
         referencestrips['geometry'] = referencestrips['geometry'].representative_point()
         return referencestrips
 
+    def listCountingPoints(self):
+        sql = """
+        SELECT
+        counting_points.Name AS Name,
+        counting_point_arcs.ArcID as ArcID
+        FROM counting_points
+        LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
+        WHERE counting_points.DirectionID >0
+        GROUP BY counting_points.Name
+        """
+        countingPoints = self.sql(sql)
+        arcs = self.sqlArcs()
+        arcs = arcs[['Name', 'XM', 'YM']]
+        countingPoints = countingPoints.join(arcs, how='left', on='ArcID', rsuffix='_arcs')
+        return countingPoints
+
     def sql(self, sql):
         """ Execute sql on loaded database"""
         return pd.read_sql(sql, self.connection)
+
+    # Functions without SQL
+    def remove_small_ships(self, df, CEMTTypeIDmax=3):
+        ship_types = self.sqlShipTypes()
+
+        small_ships = ship_types[ship_types['CEMTTypeID'] <= CEMTTypeIDmax]
+        replace_label = {}
+        # replace_description = {}
+        for k, v in small_ships.iterrows():
+            if not v['Label'] == f'M{v["CEMTTypeID"] - 1}':
+                replace_label[v['Label']] = f'M{v["CEMTTypeID"] - 1}'
+
+        ordered_ship_types = ship_types['Label'].replace(replace_label).drop_duplicates()
+
+        data_merge_small_ships = df.copy()
+        data_merge_small_ships = data_merge_small_ships.replace({'ship_types_Label': replace_label})
+        return ordered_ship_types, data_merge_small_ships
+
+    def not_empty(self, df):
+        df_notempty = df[(df['AppearanceTypeID'] > 0) & (df['TotalWeight__t'] > 0)]
+        return df_notempty

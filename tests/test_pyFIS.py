@@ -18,6 +18,8 @@ class test_pyFIS(unittest.TestCase):
 
     skipSlowRuns = True
 
+    export_dir = Path('export_pyFIS')
+
     def setUp(self):
         """Set up test fixtures, if any."""
         self.FIS = pyFIS.pyFIS()
@@ -73,7 +75,7 @@ class test_pyFIS(unittest.TestCase):
         if self.skipSlowRuns:
             self.skipTest('Skipping because this test takes very long')
         self.FIS.list_all_objects()
-        filepath = Path(f'Export_geogeneration_{self.FIS.geogeneration}.xlsx')
+        filepath = self.export_dir / f'Export_geogeneration_{self.FIS.geogeneration}.xlsx'
         self.FIS.export(filepath=filepath)
         self.assertTrue(filepath.is_file())
 
