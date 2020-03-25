@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 26 14:01:43 2017
+Postprocessing module of the SQL-database of the Inland navigation tool BIVAS.
+It will help in geting more specific results out of this huge database.
 
-@author: jong_jn
+Jurjen de Jong, Deltares
 """
 import pandas as pd
 import networkx as nx
