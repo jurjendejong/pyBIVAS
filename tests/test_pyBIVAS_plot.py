@@ -8,7 +8,7 @@ class TestpyBIVAS_plot(TestCase):
     skipSlowRuns = True
     # skipSlowRuns=("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true")
 
-    database_file = Path('resources/bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db')
+    database_file = Path(r'resources/Bivas_2018_v2.db')
 
     def setUp(self):
         # Test if database exists
@@ -17,7 +17,7 @@ class TestpyBIVAS_plot(TestCase):
 
         # Connect to database
         self.BIVAS = pyBIVAS(self.database_file)
-        self.BIVAS.set_scenario(47)
+        self.BIVAS.set_scenario()
 
         self.arcLabel = 'Waal'
         self.arcID = self.BIVAS.Arcs[self.arcLabel]
@@ -47,7 +47,7 @@ class TestpyBIVAS_plot(TestCase):
 
 
 class Test_IVS90_analyse(TestCase):
-    database_file = Path('resources/bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db')
+    database_file = Path(r'resources/Bivas_2018_v2.db')
 
     def setUp(self):
         # Test if database exists
@@ -56,7 +56,7 @@ class Test_IVS90_analyse(TestCase):
 
         # Connect to database
         self.BIVAS = IVS90_analyse(self.database_file)
-        self.BIVAS.set_scenario(47)
+        self.BIVAS.set_scenario()
 
         self.BIVAS.outputdir = Path('export_pyBIVAS_IVS90')
 
