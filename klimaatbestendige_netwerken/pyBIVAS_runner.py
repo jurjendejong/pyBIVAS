@@ -23,7 +23,7 @@ logger.setLevel(logging.INFO)
 class BIVAS_runner():
     # API settings
     bivasurl = 'http://127.0.0.1'
-    outputsettingsfile = Path(__file__).parent / 'input/OutputParameters.xml'
+    outputsettingsfile = Path(__file__).parent / 'input/pyBIVAS_runner_OutputParameters.xml'
 
     def __init__(self, scenarioName: str, scenarioID: int, BIVAS_installation_dir, BIVAS_database_file=None):
         """
@@ -111,13 +111,13 @@ class BIVAS_runner():
         con.commit()
         con.close()
 
-        print('BIVAS database copied and updated')
+        logger.info('BIVAS database copied and updated')
 
     def run(self):
         # Open BIVAS
         executable = self.BIVAS_installation_dir / 'BIVAS.exe'
 
-        subprocess.Popen(executable)
+        subprocess.Popen(str(executable))
         time.sleep(10)
 
         # Start simulation through the webapi
@@ -126,7 +126,7 @@ class BIVAS_runner():
         with open(self.outputsettingsfile, 'rb') as data:
             requests.post(url, data=data, headers=headers, verify=False)
 
-        print('BIVAS simulation started')
+        logger.info('BIVAS simulation started')
         time.sleep(5)
 
     def await_simulation(self):
@@ -142,22 +142,22 @@ class BIVAS_runner():
         d = None
         while not d:
             d = requests.get(url, data=data, headers=headers, verify=False)
-            print('{}: Waiting for BIVAS to finish...'.format(datetime.datetime.now()))
+            logger.info('{}: Waiting for BIVAS to finish...'.format(datetime.datetime.now()))
             time.sleep(60)
-        print_xmlstring(d.text)
 
-        print('{}: Finished!'.format(datetime.datetime.now()))
+        logger.info(xml_to_string(d.text))
+
+        logger.info('{}: Finished!'.format(datetime.datetime.now()))
 
         # Close BIVAS
-        print('Closing BIVAS')
+        logger.info('Closing BIVAS')
         os.system('taskkill /f /im Bivas.exe')
         time.sleep(5)
 
 
-def print_xmlstring(xmlstring):
+def xml_to_string(xmlstring):
     xmldom = xml.dom.minidom.parseString(xmlstring)
     pretty_xml_as_string = xmldom.toprettyxml()
-    print(pretty_xml_as_string)
 
 
 if __name__ == '__main__':
