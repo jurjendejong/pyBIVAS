@@ -9,8 +9,6 @@ from matplotlib.ticker import PercentFormatter
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import gc
-import random
 import logging
 
 logger = logging.getLogger(__name__)
@@ -54,9 +52,9 @@ class pyBIVAS_plot(pyBIVAS):
 
     def plot_Trips_Arc_all(self):
         for label, arcID in self.Arcs.items():
-            self.plot_Trips_Arc(arcID, label, y_unit='Totale Vaarkosten (EUR)', stacking='nstr_Short')
-            self.plot_Trips_Arc(arcID, label, y_unit='Totale Vracht (ton)', stacking='nstr_Short')
-            self.plot_Trips_Arc(arcID, label, y_unit='Aantal Vaarbewegingen (-)', stacking='nstr_Short')
+            self.plot_Trips_Arc(arcID, label, y_unit='Totale Vaarkosten (EUR)', stacking='NSTR')
+            self.plot_Trips_Arc(arcID, label, y_unit='Totale Vracht (ton)', stacking='NSTR')
+            self.plot_Trips_Arc(arcID, label, y_unit='Aantal Vaarbewegingen (-)', stacking='NSTR')
 
             self.plot_Trips_Arc(arcID, label, y_unit='Totale Vaarkosten (EUR)', stacking='appearance_types_Description')
             self.plot_Trips_Arc(arcID, label, y_unit='Totale Vracht (ton)', stacking='appearance_types_Description')
@@ -72,7 +70,7 @@ class pyBIVAS_plot(pyBIVAS):
             # self.plot_Trips_Arc(arcID, label, y_unit='Totale Vracht (ton)', stacking='ship_types_Label')
             # self.plot_Trips_Arc(arcID, label, y_unit='Aantal Vaarbewegingen (-)', stacking='ship_types_Label')
 
-    def plot_Trips_Arc(self, arcID, label, y_unit='Totale Vaarkosten (EUR)', stacking='NstrTypeCode'):
+    def plot_Trips_Arc(self, arcID, label, y_unit='Totale Vaarkosten (EUR)', stacking='NSTR'):
         """
         This function creates multiple barplots of trips passing a given arc as as function on the draft
 
@@ -110,7 +108,7 @@ class pyBIVAS_plot(pyBIVAS):
             titlestring = ''
             figtype1 = y_unit
 
-        if stacking == 'nstr_Short':
+        if stacking == 'NSTR':
             figtype2 = 'NSTR'
         elif stacking == 'ship_types_Label':
             figtype2 = 'Scheepvaartklasse'
@@ -134,9 +132,9 @@ class pyBIVAS_plot(pyBIVAS):
         plt.title(titlestring)
         # plt.gca().yaxis.set_major_formatter(PercentFormatter(xmax=tp.sum().sum()))
 
-        plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.png'.format(figtype1, label, figtype2),
+        plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.png',
                     dpi=300, bbox_inches='tight')
-        plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.svg'.format(figtype1, label, figtype2),
+        plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.svg',
                     dpi=300, bbox_inches='tight')
         tp.to_csv(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.csv')
 
@@ -206,81 +204,68 @@ class pyBIVAS_plot(pyBIVAS):
         if not figdir.exists():
             figdir.mkdir()
 
+        # Do not take into account the number of trips as a result of the BIVAS computation! (temporary)
+        compute_route_statistics_original = self.compute_route_statistics
+        self.compute_route_statistics = compute_route_statistics_original.replace('trips.NumberOfTrips', '1')
+
         # SQL kosten en trips voor alle trips die langs een opgegeven Arc komen
         dfArcs = {}
-        for Arc in sorted(self.Arcs):
-            sql = """
-            SELECT trips_{0}.NstrTypeCode AS NstrTypeCode,
-                   SUM(routestat.VariableCosts__Eur) + SUM(routestat.FixedCosts__Eur) AS "Totale Vaarkosten",
-                   SUM(trips_{0}.TotalWeight__t) AS "Totale Vracht",
-                   COUNT(*) AS "Aantal Vaarbewegingen"
-            FROM routes_{0}
-            LEFT JOIN trips_{0} ON routes_{0}.TripID = trips_{0}.ID
-            LEFT JOIN route_statistics_{0} AS routestat ON routes_{0}.TripID = routestat.TripID
-            WHERE ArcID = {1}
-            GROUP BY NstrTypeCode
-            """.format(self.scenarioID, self.Arcs[Arc])
+        for ArcName, ArcID in self.Arcs.items():
+            df = self.sqlArcDetails(ArcID, group_by='NSTR')
+            dfArcs[ArcName] = df[["Totale Vaarkosten (EUR)", "Totale Vracht (ton)", "Aantal Vaarbewegingen (-)"]]
 
-            dfArcs[Arc] = self.sql(sql)
-            dfArcs[Arc] = dfArcs[Arc].replace({'NstrTypeCode': self.NSTR_shortnames})
-            dfArcs[Arc] = dfArcs[Arc].set_index('NstrTypeCode')
+        # Reset settings
+        self.compute_route_statistics = compute_route_statistics_original
 
-        dfArcs = pd.concat(dfArcs, axis=1, sort=True)
+        dfAllArcs = self.sqlAdvancedRoutes(group_by='NSTR')
+        dfAllArcs = dfAllArcs[["Totale Vaarkosten (EUR)", "Totale Vracht (ton)", "Aantal Vaarbewegingen (-)"]]
+
+        dfArcs['Totaal'] = dfAllArcs
+
+        arc_order = list(self.Arcs.keys()) + ['Totaal']
+        dfArcs = pd.concat(dfArcs, axis=1, sort=False)[arc_order]
         dfArcs = dfArcs.sort_index(axis=0)
 
-        # Een totaal regel toevoegen met de totalen
-        sql = """
-        SELECT trips_{0}.NstrTypeCode AS NstrTypeCode,
-               SUM(routestat.VariableCosts__Eur) + SUM(routestat.FixedCosts__Eur) AS "Totale Vaarkosten",
-               SUM(trips_{0}.TotalWeight__t) AS "Totale Vracht",
-               COUNT(*) AS "Aantal Vaarbewegingen"
-        FROM routes_{0}
-        LEFT JOIN trips_{0} ON routes_{0}.TripID = trips_{0}.ID
-        LEFT JOIN route_statistics_{0} AS routestat ON routes_{0}.TripID = routestat.TripID
-        WHERE RouteIndex = 0
-        GROUP BY NstrTypeCode
-        """.format(self.scenarioID)
-        a = self.sql(sql).replace({'NstrTypeCode': self.NSTR_shortnames}).set_index('NstrTypeCode')
-
-        for c in a.columns:
-            dfArcs['Totaal', c] = a[c]
-
-        # cols = dfArcs.columns.levels[0].drop('Totaal').tolist()
-        # cols.append('Totaal')
-        # dfArcs = dfArcs[cols]
 
         dfArcs = dfArcs.swaplevel(axis=1)
 
-        (dfArcs['Totale Vaarkosten'] / 1e9).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
+
+        # Plot vaarkosten
+        (dfArcs['Totale Vaarkosten (EUR)'] / 1e9).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
                                                              cmap='tab20c')
         plt.grid()
         plt.xlabel('totale vaarkosten (miljarden EUR)')
-        plt.legend(loc=1, frameon=True)
+        plt.legend(loc='center right', frameon=True)
         plt.gca().invert_yaxis()
         plt.gca().get_yticklabels()[-1].set_weight("bold")
         plt.axhline(len(self.Arcs) - 0.5, c='k', ls='--')
         plt.xlim(0, 2.5)
         plt.savefig(figdir / 'Aandeel totale kosten per vaarweg', kind='png', dpi=300, bbox_inches='tight')
+        dfArcs["Totale Vaarkosten (EUR)"].transpose().to_csv(figdir / 'Aandeel totale kosten per vaarweg.csv')
 
-        (dfArcs["Totale Vracht"] / 1e6).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
+        # Plot vracht
+        (dfArcs["Totale Vracht (ton)"] / 1e6).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
                                                          cmap='tab20c')
         plt.grid()
         plt.xlabel('totale vracht (mln ton)')
-        plt.legend(loc=1, frameon=True)
+        plt.legend(loc='center right', frameon=True)
         plt.gca().invert_yaxis()
         plt.gca().get_yticklabels()[-1].set_weight("bold")
         plt.axhline(len(self.Arcs) - 0.5, c='k', ls='--')
         plt.savefig(figdir / 'Aandeel vracht per vaarweg', kind='png', dpi=300, bbox_inches='tight')
+        dfArcs["Totale Vracht (ton)"].transpose().to_csv(figdir / 'Aandeel vracht per vaarweg.csv')
 
-        dfArcs["Aantal Vaarbewegingen"].transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
+        # Plot aantal vaarbeweingen
+        dfArcs["Aantal Vaarbewegingen (-)"].transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
                                                          cmap='tab20c')
         plt.grid()
         plt.xlabel('Aantal vaarbewegingen')
-        plt.legend(loc=1, frameon=True)
+        plt.legend(loc='center right', frameon=True)
         plt.gca().invert_yaxis()
         plt.gca().get_yticklabels()[-1].set_weight("bold")
         plt.axhline(len(self.Arcs) - 0.5, c='k', ls='--')
         plt.savefig(figdir / 'Aantal vaarbewegingen per vaarweg', kind='png', dpi=300, bbox_inches='tight')
+        dfArcs["Aantal Vaarbewegingen (-)"].transpose().to_csv(figdir / 'Aantal vaarbewegingen per vaarweg.csv')
 
     def plot_vergelijking_trafficScenarios(self, trafficScenarios: list):
         figdir = self.outputdir / 'figures_Vergelijking_TrafficScenarios'
@@ -291,23 +276,23 @@ class pyBIVAS_plot(pyBIVAS):
         SELECT
         SUM(NumberOfTrips) as nTrips,
         SUM(TotalWeight__t * NumberOfTrips) as totalWeight,
-        NstrTypeCode,
+        NstrGoodsClassification AS NSTR,
         traffic_scenarios.Description AS Scheepvaartbestand
-        from trips
+        FROM trips
         LEFT JOIN traffic_scenarios ON TrafficScenarioID = traffic_scenarios.ID
         WHERE TrafficScenarioID IN ({', '.join(str(t) for t in trafficScenarios)})
-        GROUP BY NstrTypeCode, Scheepvaartbestand
+        GROUP BY NstrGoodsClassification, Scheepvaartbestand
         ORDER BY TrafficScenarioID
         """
         df = self.sql(sql)
-        df = df.replace({'NstrTypeCode': self.NSTR_shortnames})
+        df = df.replace({'NSTR': self.NSTR_shortnames})
 
         trafficScenarios_table = self.sqlCountTripsPerTrafficScenario()
         trafficScenarios_names = trafficScenarios_table['Description'].loc[trafficScenarios]
 
         ## Vaarbewegingen
 
-        df_pivot = df.pivot_table(columns='Scheepvaartbestand', index='NstrTypeCode', values='nTrips')
+        df_pivot = df.pivot_table(columns='Scheepvaartbestand', index='NSTR', values='nTrips')
         df_pivot = df_pivot.reindex(columns=trafficScenarios_names)
         df_pivot.index.name = ''
 
@@ -320,7 +305,7 @@ class pyBIVAS_plot(pyBIVAS):
 
         ## Vracht
 
-        df_pivot = df.pivot_table(columns='Scheepvaartbestand', index='NstrTypeCode', values='totalWeight')
+        df_pivot = df.pivot_table(columns='Scheepvaartbestand', index='NSTR', values='totalWeight')
         df_pivot = df_pivot.reindex(columns=trafficScenarios_names)
         df_pivot.index.name = ''
 
@@ -473,6 +458,8 @@ class pyBIVAS_plot(pyBIVAS):
 
 class IVS90_analyse(pyBIVAS_plot):
 
+    outputdir = Path('.')
+
     def __init__(self,
                  databasefile=None,
                  label_traffic_scenario=[2011, 2013, 2014, 2016, 2017, 2018],
@@ -499,6 +486,10 @@ class IVS90_analyse(pyBIVAS_plot):
 
     # Jaarlijkse variatie
     def plot_CountingPointsForYear(self, telpunt='Prins Bernhardsluis', jaar=2018):
+        figdir = self.outputdir / 'figures_CountingPointsForYear'
+        if not figdir.exists():
+            figdir.mkdir()
+
         print(telpunt, jaar)
 
         # Set variables
@@ -539,14 +530,17 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.grid()
         plt.ylabel('Aantal passages')
 
-        plt.savefig('Tijdserie_{}_{}.png'.format(telpunt, jaar), dpi=300)
-        df.to_csv('Tijdserie_{}_{}.csv'.format(telpunt, jaar))
+        plt.savefig(figdir / 'Tijdserie_{}_{}.png'.format(telpunt, jaar), dpi=300)
+        df.to_csv(figdir / 'Tijdserie_{}_{}.csv'.format(telpunt, jaar))
 
-        plt.show()
-        return
+        plt.close()
 
     # Opbouw vaarbewegingen
     def plot_CEMTclassesForYear(self, telpunt='Prins Bernhardsluis', jaar=2018):
+        figdir = self.outputdir / 'figures_CEMTclassesForYear'
+        if not figdir.exists():
+            figdir.mkdir()
+
         print(telpunt, jaar)
 
         # Set variables
@@ -587,13 +581,14 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.savefig('CEMT_{}_{}.png'.format(telpunt, jaar), dpi=300)
         df.to_csv('CEMT_{}_{}.csv'.format(telpunt, jaar))
 
-        plt.show()
-        return
+        plt.close()
 
     def plot_YearlyChanges_Timeseries(self, telpunt='Prins Bernhardsluis'):
-        print(telpunt)
+        figdir = self.outputdir / 'figures_YearlyChanges_Timeseries'
+        if not figdir.exists():
+            figdir.mkdir()
 
-        global dfs
+        print(telpunt)
 
         dfs = {}
         for jaar in self.traffic_scenarios.index:
@@ -645,13 +640,14 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.savefig('HistorischVerloop_{}.png'.format(telpunt), dpi=300)
         dfs.to_csv('HistorischVerloop_{}.csv'.format(telpunt))
 
-        plt.show()
-        return
+        plt.close()
 
     def plot_YearlyChangesCEMT(self, telpunt='Born sluis'):
-        print(telpunt)
+        figdir = self.outputdir / 'figures_YearlyChangesCEMT'
+        if not figdir.exists():
+            figdir.mkdir()
 
-        global dfs
+        print(telpunt)
 
         dfs = {}
         for jaar in self.traffic_scenarios.index:
@@ -697,13 +693,14 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.savefig('HistorischVerloopYearCEMT_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
         dfs.to_csv('HistorischVerloopYearCEMT_{}.csv'.format(telpunt))
 
-        plt.show()
-        return
+        plt.close()
 
     def plot_YearlyChangesRWSklasse(self, telpunt='Maasbracht sluis'):
-        print(telpunt)
+        figdir = self.outputdir / 'figures_YearlyChangesRWSklasse'
+        if not figdir.exists():
+            figdir.mkdir()
 
-        global dfs
+        print(telpunt)
 
         dfs = {}
         for jaar in self.traffic_scenarios.index:
@@ -749,8 +746,7 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.savefig('HistorischVerloopYearRWSklasse_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
         dfs.to_csv('HistorischVerloopYearRWSklasse_{}.csv'.format(telpunt))
 
-        plt.show()
-        return
+        plt.close()
 
     def plot_all(self):
         countingPoints = self.listCountingPoints()
