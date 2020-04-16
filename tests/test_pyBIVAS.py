@@ -14,7 +14,7 @@ class test_pyBIVAS(unittest.TestCase):
     skipSlowRuns = True
     # skipSlowRuns=("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true")
 
-    database_file = Path('resources/bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db')
+    database_file = Path(r'resources/Bivas_2018_v2.db')
 
     arcID = 6332
     arcIDs = [6332, 9204, 8886]
