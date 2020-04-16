@@ -24,6 +24,8 @@ class TestpyBIVAS_plot(TestCase):
 
         self.BIVAS.outputdir = Path('export_pyBIVAS_plot')
 
+        if not self.BIVAS.outputdir.exists():
+            self.BIVAS.outputdir.mkdir()
 
     def test_plot_trips_arc(self):
         self.BIVAS.plot_Trips_Arc(arcID=self.arcID, label='test')
@@ -35,7 +37,7 @@ class TestpyBIVAS_plot(TestCase):
         self.BIVAS.plot_vergelijking_vaarwegen()
 
     def test_plot_vergelijking_traffic_scenario(self):
-        self.BIVAS.plot_vergelijking_trafficScenarios([13,14,12])
+        self.BIVAS.plot_vergelijking_trafficScenarios([13, 14, 12])
 
     def test_plot_beladingsgraad(self):
         self.BIVAS.plot_Beladingsgraad(self.arcID, self.arcLabel)
@@ -57,6 +59,9 @@ class Test_IVS90_analyse(TestCase):
         self.BIVAS.set_scenario(47)
 
         self.BIVAS.outputdir = Path('export_pyBIVAS_IVS90')
+
+        if not self.BIVAS.outputdir.exists():
+            self.BIVAS.outputdir.mkdir()
 
     def test_plot_CountingPointsForYear(self):
         self.BIVAS.plot_CountingPointsForYear()

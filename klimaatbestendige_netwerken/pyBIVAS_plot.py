@@ -474,10 +474,11 @@ class pyBIVAS_plot(pyBIVAS):
 class IVS90_analyse(pyBIVAS_plot):
 
     def __init__(self,
+                 databasefile=None,
                  label_traffic_scenario=[2011, 2013, 2014, 2016, 2017, 2018],
                  reference_trip_ids=[1, 2, 3, 4, 5, 6]
                  ):
-        super().__init__()
+        super().__init__(databasefile=databasefile)
 
         sql = """SELECT * FROM traffic_scenarios"""
         traffic_scenarios = self.sql(sql)
