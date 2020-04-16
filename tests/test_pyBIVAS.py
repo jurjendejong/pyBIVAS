@@ -137,6 +137,10 @@ class test_pyBIVAS(unittest.TestCase):
         ship_types = ship_types.join(cemt_class, on='CEMTTypeID', rsuffix='_CEMT').set_index('Label')
         print(ship_types.head(10).to_string())
 
+    def test_routesFromArc(self):
+        df = self.BIVAS.routesFromArc(self.arcID)
+        print(df.head(10).to_string())
+
 
 if __name__ == '__main__':
     unittest.main()

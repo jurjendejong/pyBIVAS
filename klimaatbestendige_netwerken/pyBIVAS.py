@@ -565,6 +565,23 @@ class pyBIVAS:
         df = df.set_index('ArcID')
         return df
 
+    def routesFromArc(self, arcID):
+        """
+        For a given arcID, this function analyses how all trips passing this Arc are distributed over the network.
+        """
+
+        sql = f"""
+        SELECT routes.ArcID AS ArcID,
+        COUNT(*) AS "Aantal"
+        FROM routes_{self.scenarioID} AS routes_passing_arc
+        INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+        WHERE routes_passing_arc.ArcID = {arcID}
+        GROUP BY routes.ArcID
+        """
+        df = self.sql(sql)
+        df = df.set_index('ArcID')
+        return df
+
     """
     Network function
     """
