@@ -52,8 +52,10 @@ class pyBIVAS:
         SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
         SUM(trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
         SUM(route_statistics.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
-        SUM(route_statistics.VariableCosts__Eur  * trips.NumberOfTrips) + SUM(route_statistics.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
-        SUM(route_statistics.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
+        SUM(route_statistics.VariableTimeCosts__Eur  * trips.NumberOfTrips) + SUM(route_statistics.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
+        SUM(route_statistics.VariableTimeCosts__Eur * trips.NumberOfTrips) + SUM(route_statistics.VariableDistanceCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
+        SUM(route_statistics.VariableTimeCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele-Tijd Vaarkosten (EUR)",
+        SUM(route_statistics.VariableDistanceCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele-Afstand Vaarkosten (EUR)",
         SUM(route_statistics.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
         SUM(route_statistics.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
         SUM((trips.TotalWeight__t * route_statistics.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
@@ -203,10 +205,8 @@ class pyBIVAS:
         SELECT DATE(trips_{0}.DateTime) AS date,
                count(*) AS nTrips,
                SUM(trips_{0}.TotalWeight__t) AS SumTotalWeight__t
-        FROM infeasible_trips
+        FROM infeasible_trips_{0} AS infeasible_trips
         LEFT JOIN trips_{0} ON infeasible_trips.TripID = trips_{0}.ID
-        LEFT JOIN branching$branch_sets ON infeasible_trips.BranchSetID = branching$branch_sets.Id
-        WHERE branching$branch_sets.BranchID = {0}
         GROUP BY DATE(DateTime)
         """.format(self.scenarioID)
         df = pd.read_sql(sql, self.connection)
@@ -216,19 +216,17 @@ class pyBIVAS:
 
     def loadAllInfeasible(self):
         sql = """
-        SELECT nstr_types.Code AS "NSTR",
+        SELECT nstr_mapping.GroupCode AS "NSTR",
                appearance_types.Description AS "Vorm",
                DATE(trips.DateTime) AS "Days",
                trips.ID AS "ID",
                (trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
                (trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
                (trips.TwentyFeetEquivalentUnits) AS "Totale TEU (-)"
-        FROM infeasible_trips
+        FROM infeasible_trips_{0} AS infeasible_trips
         LEFT JOIN trips_{0} AS trips ON infeasible_trips.TripID = trips.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
-        LEFT JOIN branching$branch_sets ON infeasible_trips.BranchSetID = branching$branch_sets.Id
+        LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
-        WHERE branching$branch_sets.BranchID = {0}
         """.format(self.scenarioID)
 
         df = pd.read_sql(sql, self.connection)
@@ -240,23 +238,14 @@ class pyBIVAS:
     def sqlRouteStatistics(self):
         """Routes in scenario per date"""
 
-        sql = """
-        SELECT DATE(trips_{0}.DateTime) AS date,
-               SUM( VariableCosts__Eur) AS SumVariableCosts,
-               SUM( FixedCosts__Eur) AS SumFixedCosts,
-               SUM( TravelTime__min) AS SumTravelTime,
-               SUM( Distance__km  ) AS SumDistance,
-               SUM( VariableCosts__Eur * trips_{0}.NumberOfTrips) AS SumVariableCostsTrips,
-               SUM( FixedCosts__Eur * trips_{0}.NumberOfTrips   ) AS SumFixedCostsTrips,
-               SUM( FixedCosts__Eur * trips_{0}.NumberOfTrips  +  VariableCosts__Eur * trips_{0}.NumberOfTrips) AS SumTotalCostsTrips,
-               SUM( TravelTime__min * trips_{0}.NumberOfTrips   ) AS SumTravelTimeTrips,
-               SUM( Distance__km * trips_{0}.NumberOfTrips      ) AS SumDistanceTrips,
-               SUM( trips_{0}.NumberOfTrips                     ) AS SumNumberOfTrips,
-               COUNT(*) AS count
-        FROM route_statistics_{0}
-        LEFT JOIN trips_{0} ON route_statistics_{0}.TripID = trips_{0}.ID
-        GROUP BY DATE(trips_{0}.DateTime)
-        """.format(self.scenarioID)
+        sql = f"""
+        SELECT DATE(trips.DateTime) AS date,
+               COUNT(*) AS count,
+               {self.compute_route_statistics}
+        FROM route_statistics_{self.scenarioID} AS route_statistics
+        LEFT JOIN trips_{self.scenarioID} AS trips ON route_statistics.TripID = trips.ID
+        GROUP BY DATE(trips.DateTime)
+        """
         df = pd.read_sql(sql, self.connection)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
@@ -300,11 +289,11 @@ class pyBIVAS:
         """
 
         ArcIDsStr = str(ArcIDs).strip('[]')
-        sql = """
+        sql = f"""
         SELECT SeasonID, WaterDepth__m, ArcID
         FROM water_scenario_values
-        WHERE ArcID IN ({}) AND WaterScenarioID={}
-        """.format(ArcIDsStr, self.WaterScenarioID)
+        WHERE ArcID IN ({ArcIDsStr}) AND WaterScenarioID={self.WaterScenarioID}
+        """
         df = pd.read_sql(sql, self.connection)
         df = df.set_index('SeasonID')
 
@@ -371,9 +360,9 @@ class pyBIVAS:
                 sql_groupby += 'Days, '
 
             if 'NSTR' in group_by:
-                sql_select += 'nstr_types.Code AS "NSTR",'
-                sql_groupby += 'NstrTypeCode, '
-                sql_leftjoin += 'LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code '
+                sql_select += 'nstr_mapping.GroupCode AS "NSTR",'
+                sql_groupby += 'NstrGoodsClassification, '
+                sql_leftjoin += 'LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode '
 
             if 'Vorm' in group_by:
                 sql_select += 'appearance_types.Description AS "Vorm",'
@@ -458,15 +447,15 @@ class pyBIVAS:
                    ship_types.Description AS ship_types_Description,
                    cemt_class.ID AS cemt_class_ID,
                    cemt_class.Description AS cemt_class_Description,
-                   nstr_types.Code AS nstr_Short,
-                   nstr_types.Description AS nstr_Description,
+                   nstr_mapping.GroupCode AS nstr_Short,
+                   nstr_mapping.Description AS nstr_Description,
                    appearance_types.Description AS appearance_types_Description,
                    dangerous_goods_levels.Description AS dangerous_goods_levels_Description,
                    {self.compute_route_statistics}
             FROM routes_{self.scenarioID} AS routes
             LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
             LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
-            LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+            LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
             LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
             LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
             LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
@@ -518,12 +507,12 @@ class pyBIVAS:
         SELECT trips.*,
                ship_types.Label,
                ship_types.Description,
-               nstr_types.Description AS nstr_description,
+               nstr_mapping.Description AS nstr_description,
                appearance_types.Description AS appear_description,
                dangerous_goods_levels.Description AS dangerous_description
         FROM trips_{0} AS trips
         LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+        LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
         """.format(self.scenarioID)
@@ -542,21 +531,14 @@ class pyBIVAS:
 
         listOfTrips = ",".join(str(t) for t in tripsArray)
 
-        sql = """
+        sql = f"""
         SELECT trips.ID,
-               (trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
-               (trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
-               (trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
-               (routeStats.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
-               (routeStats.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
-               (routeStats.VariableCosts__Eur  * trips.NumberOfTrips) + (routeStats.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
-               (routeStats.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
-               (routeStats.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
-               ((trips.TotalWeight__t * routeStats.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
-            FROM trips_{0} AS trips
-            LEFT JOIN route_statistics_{0} AS routeStats ON routeStats.TripID = trips.ID
-            WHERE trips.ID IN ({1})
-        """.format(self.scenarioID, listOfTrips)
+               {self.compute_route_statistics}
+            FROM trips_{self.scenarioID} AS trips
+            LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = trips.ID
+            WHERE trips.ID IN ({listOfTrips})
+            GROUP BY trips.ID
+        """
         df2 = pd.read_sql(sql, self.connection)
         df2 = df2.set_index('ID')
         return df2
@@ -652,7 +634,7 @@ class pyBIVAS:
 
         sql = """
         SELECT (route_statistics_{0}.TravelTime__min - route_statistics_{1}.TravelTime__min) AS ChangeInTravelTime,
-                trips_{0}.NstrTypeCode AS NstrTypeCode,
+                trips_{0}.NstrGoodsClassification AS NstrTypeCode,
                 trips_{0}.TotalWeight__t * trips_{0}.NumberOfTrips AS TotalWeight__t,
                 trips_{0}.NumberOfTrips AS nTrips
         FROM route_statistics_{0}
@@ -766,14 +748,14 @@ class pyBIVAS:
         sql = """
         SELECT  trips.*,
                 route.*,
-                nstr_types.Description AS nstr_description,
+                nstr_mapping.Description AS nstr_description,
                 appearance_types.Description AS appear_description,
                 ship_types.Label AS ship_label,
                 ship_types.Description as ship_description,
                 dangerous_goods_levels.Description AS dangerous_description
         FROM route_statistics_{0} AS route
         LEFT JOIN trips_{0} AS trips ON route.TripID = trips.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+        LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID

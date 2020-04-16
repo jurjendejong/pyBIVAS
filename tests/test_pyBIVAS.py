@@ -34,7 +34,10 @@ class test_pyBIVAS(unittest.TestCase):
 
         # Connect to database
         self.BIVAS = pyBIVAS(self.database_file)
-        self.BIVAS.set_scenario(47)
+        self.BIVAS.set_scenario()
+
+        if not self.exportdir.exists():
+            self.exportdir.mkdir()
 
     def test_overviewScenarios(self):
         df = self.BIVAS.sqlOverviewOfScenarios()
