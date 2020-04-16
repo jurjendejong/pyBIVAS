@@ -11,9 +11,6 @@ import shutil
 class test_pyBIVAS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
 
-    skipSlowRuns = True
-    # skipSlowRuns=("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true")
-
     database_file = Path(r'resources/Bivas_2018_v2.db')
 
     arcID = 6332
@@ -83,9 +80,11 @@ class test_pyBIVAS(unittest.TestCase):
         print(df.head(10).to_string())
 
     def test_sqlArcDetails(self):
-        if self.skipSlowRuns:
-            self.skipTest('Skipping because this test takes very long')
         df = self.BIVAS.sqlArcDetails(self.arcID)  # list of trips (with details) on given arc
+        print(df.head(10).to_string())
+
+    def test_sqlArcDetails2(self):
+        df = self.BIVAS.sqlArcDetails(self.arcID, extended=False)  # list of trips (without details) on given arc
         print(df.head(10).to_string())
 
     def test_sqlRouteStats(self):
