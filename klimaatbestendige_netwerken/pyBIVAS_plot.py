@@ -498,7 +498,7 @@ class IVS90_analyse(pyBIVAS_plot):
         if not figdir.exists():
             figdir.mkdir()
 
-        print(telpunt, jaar)
+        logger.info(f'Plotting CountingPointsForYear voor telpunt: {telpunt}, jaar: {jaar}')
 
         # Set variables
         referenceSetId = self.traffic_scenarios.loc[jaar, 'reference_trips_sets_id']
@@ -549,7 +549,7 @@ class IVS90_analyse(pyBIVAS_plot):
         if not figdir.exists():
             figdir.mkdir()
 
-        print(telpunt, jaar)
+        logger.info(f'Plotting CEMTclassesForYear voor telpunt: {telpunt}, jaar: {jaar}')
 
         # Set variables
         referenceSetId = self.traffic_scenarios.loc[jaar, 'reference_trips_sets_id']
@@ -586,8 +586,8 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.grid()
         plt.ylabel('Verdeling CEMT klasse (naar aantal passages)')
 
-        plt.savefig('CEMT_{}_{}.png'.format(telpunt, jaar), dpi=300)
-        df.to_csv('CEMT_{}_{}.csv'.format(telpunt, jaar))
+        plt.savefig(figdir / 'CEMT_{}_{}.png'.format(telpunt, jaar), dpi=300)
+        df.to_csv(figdir / 'CEMT_{}_{}.csv'.format(telpunt, jaar))
 
         plt.close()
 
@@ -596,7 +596,7 @@ class IVS90_analyse(pyBIVAS_plot):
         if not figdir.exists():
             figdir.mkdir()
 
-        print(telpunt)
+        logger.info(f'Plotting YearlyChanges_Timeseries voor telpunt: {telpunt}')
 
         dfs = {}
         for jaar in self.traffic_scenarios.index:
@@ -620,7 +620,7 @@ class IVS90_analyse(pyBIVAS_plot):
             """.format(referenceSetId, countingPointName, trafficScenarioId)
             df = self.sql(sql)
             if not len(df):
-                return 'No data'
+                continue
 
             # Format data
             df['Days'] = pd.to_datetime(df['Days'])
@@ -636,6 +636,9 @@ class IVS90_analyse(pyBIVAS_plot):
 
             dfs[jaar] = df
 
+        if not len(dfs):
+            return 'No data'
+
         dfs = pd.concat(dfs, axis=1)
 
         # Plot data
@@ -645,8 +648,8 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('Aantal passages')
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-        plt.savefig('HistorischVerloop_{}.png'.format(telpunt), dpi=300)
-        dfs.to_csv('HistorischVerloop_{}.csv'.format(telpunt))
+        plt.savefig(figdir / 'HistorischVerloop_{}.png'.format(telpunt), dpi=300)
+        dfs.to_csv(figdir / 'HistorischVerloop_{}.csv'.format(telpunt))
 
         plt.close()
 
@@ -655,7 +658,7 @@ class IVS90_analyse(pyBIVAS_plot):
         if not figdir.exists():
             figdir.mkdir()
 
-        print(telpunt)
+        logger.info(f'Plotting YearlyChangesCEMT voor telpunt: {telpunt}')
 
         dfs = {}
         for jaar in self.traffic_scenarios.index:
@@ -682,11 +685,14 @@ class IVS90_analyse(pyBIVAS_plot):
             """.format(referenceSetId, countingPointName, trafficScenarioId)
             df = self.sql(sql)
             if not len(df):
-                return 'No data'
+                continue
 
             df.set_index('CEMT_klasse', inplace=True)
 
             dfs[jaar] = df['nTrips']
+
+        if not len(dfs):
+            return 'No data'
 
         dfs = pd.concat(dfs, axis=1, sort=False)
         dfs = dfs.reindex(index=[o for o in self.cemt_order if o in dfs.index])
@@ -698,8 +704,8 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('Aantal passages')
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-        plt.savefig('HistorischVerloopYearCEMT_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
-        dfs.to_csv('HistorischVerloopYearCEMT_{}.csv'.format(telpunt))
+        plt.savefig(figdir / 'HistorischVerloopYearCEMT_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
+        dfs.to_csv(figdir / 'HistorischVerloopYearCEMT_{}.csv'.format(telpunt))
 
         plt.close()
 
@@ -708,7 +714,7 @@ class IVS90_analyse(pyBIVAS_plot):
         if not figdir.exists():
             figdir.mkdir()
 
-        print(telpunt)
+        logger.info(f'Plotting YearlyChangesRWSklasse voor telpunt: {telpunt}')
 
         dfs = {}
         for jaar in self.traffic_scenarios.index:
@@ -736,10 +742,13 @@ class IVS90_analyse(pyBIVAS_plot):
             """.format(referenceSetId, countingPointName, trafficScenarioId)
             df = self.sql(sql)
             if not len(df):
-                return 'No data'
+                continue
 
             df.set_index('RWS_klasse', inplace=True)
             dfs[jaar] = df['nTrips']
+
+        if not len(dfs):
+            return 'No data'
 
         dfs = pd.concat(dfs, axis=1, sort=False)
         dfs = dfs.reindex(index=[o for o in self.ship_types_order])
@@ -751,8 +760,8 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('Aantal passages')
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-        plt.savefig('HistorischVerloopYearRWSklasse_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
-        dfs.to_csv('HistorischVerloopYearRWSklasse_{}.csv'.format(telpunt))
+        plt.savefig(figdir / 'HistorischVerloopYearRWSklasse_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
+        dfs.to_csv(figdir / 'HistorischVerloopYearRWSklasse_{}.csv'.format(telpunt))
 
         plt.close()
 
