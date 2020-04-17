@@ -141,6 +141,9 @@ class test_pyBIVAS(unittest.TestCase):
         df = self.BIVAS.routesFromArc(self.arcID)
         print(df.head(10).to_string())
 
+    def test_routesFromArc2(self):
+        df = self.BIVAS.routesFromArc(self.arcIDs[:2], not_passing_arcID=self.arcIDs[-1])
+        print(df.head(10).to_string())
 
 if __name__ == '__main__':
     unittest.main()
