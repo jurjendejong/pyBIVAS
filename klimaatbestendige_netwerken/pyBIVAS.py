@@ -12,7 +12,7 @@ import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 try:
     import geopandas
@@ -45,20 +45,19 @@ class pyBIVAS:
         'Overig': 'Leeg'
     }
 
-    # Warning: The TEU are not corrected for the number of trips prior to BIVAS 4.8.
-    # Therefor 'Totale TEU' is only valid for BIVAS 4.8 and above
     compute_route_statistics = """
         SUM(trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
         SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
         SUM(trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
         SUM(route_statistics.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
-        SUM(route_statistics.VariableCosts__Eur  * trips.NumberOfTrips) + SUM(route_statistics.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
-        SUM(route_statistics.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
+        SUM(route_statistics.VariableTimeCosts__Eur * trips.NumberOfTrips) + SUM(route_statistics.VariableDistanceCosts__Eur * trips.NumberOfTrips) + SUM(route_statistics.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
+        SUM(route_statistics.VariableTimeCosts__Eur * trips.NumberOfTrips) + SUM(route_statistics.VariableDistanceCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
+        SUM(route_statistics.VariableTimeCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele-Tijd Vaarkosten (EUR)",
+        SUM(route_statistics.VariableDistanceCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele-Afstand Vaarkosten (EUR)",
         SUM(route_statistics.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
         SUM(route_statistics.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
         SUM((trips.TotalWeight__t * route_statistics.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
     """
-
 
     def __init__(self, databasefile=None):
         """
@@ -118,6 +117,8 @@ class pyBIVAS:
                                                     'TrafficScenarioID']
         self.WaterScenarioID = scenarioOverview.loc[self.scenarioID,
                                                     'WaterScenarioID']
+        self.ReferenceTripSetID = scenarioOverview.loc[self.scenarioID,
+                                                       'ReferenceTripSetID']
 
     def sqlOverviewOfScenarios(self):
         """Overview of all scenarios with parameters"""
@@ -129,10 +130,9 @@ class pyBIVAS:
         JOIN parameters ON branching$branch_sets.ID = parameters.BranchSetID
         ORDER BY scenarios.ID
         """
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df = df.set_index('ID')
         return df
-
 
     def sqlAppearanceTypes(self, rename_to_Leeg=True):
         sql = """SELECT * FROM appearance_types ORDER BY Id"""
@@ -158,7 +158,7 @@ class pyBIVAS:
         FROM trips
         LEFT JOIN traffic_scenarios ON TrafficScenarioID = traffic_scenarios.ID
         GROUP BY TrafficScenarioID"""
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df.set_index('ID', inplace=True)
         return df
 
@@ -175,7 +175,7 @@ class pyBIVAS:
         WHERE traffic_scenarios.ID = '{0}'
         GROUP BY DATE(trips.DateTime)
         """.format(self.trafficScenario)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
         return df
@@ -192,7 +192,7 @@ class pyBIVAS:
         FROM trips_{0}
         GROUP BY DATE(DateTime)
         """.format(self.scenarioID)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
         return df
@@ -203,35 +203,31 @@ class pyBIVAS:
         SELECT DATE(trips_{0}.DateTime) AS date,
                count(*) AS nTrips,
                SUM(trips_{0}.TotalWeight__t) AS SumTotalWeight__t
-        FROM infeasible_trips
+        FROM infeasible_trips_{0} AS infeasible_trips
         LEFT JOIN trips_{0} ON infeasible_trips.TripID = trips_{0}.ID
-        LEFT JOIN branching$branch_sets ON infeasible_trips.BranchSetID = branching$branch_sets.Id
-        WHERE branching$branch_sets.BranchID = {0}
         GROUP BY DATE(DateTime)
         """.format(self.scenarioID)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
         return df
 
     def loadAllInfeasible(self):
         sql = """
-        SELECT nstr_types.Code AS "NSTR",
+        SELECT nstr_mapping.GroupCode AS "NSTR",
                appearance_types.Description AS "Vorm",
                DATE(trips.DateTime) AS "Days",
                trips.ID AS "ID",
                (trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
                (trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
                (trips.TwentyFeetEquivalentUnits) AS "Totale TEU (-)"
-        FROM infeasible_trips
+        FROM infeasible_trips_{0} AS infeasible_trips
         LEFT JOIN trips_{0} AS trips ON infeasible_trips.TripID = trips.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
-        LEFT JOIN branching$branch_sets ON infeasible_trips.BranchSetID = branching$branch_sets.Id
+        LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
-        WHERE branching$branch_sets.BranchID = {0}
         """.format(self.scenarioID)
 
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df['Days'] = pd.to_datetime(df['Days'])
         df = df.replace({'NSTR': self.NSTR_shortnames})
         df = df.set_index('ID')
@@ -240,24 +236,15 @@ class pyBIVAS:
     def sqlRouteStatistics(self):
         """Routes in scenario per date"""
 
-        sql = """
-        SELECT DATE(trips_{0}.DateTime) AS date,
-               SUM( VariableCosts__Eur) AS SumVariableCosts,
-               SUM( FixedCosts__Eur) AS SumFixedCosts,
-               SUM( TravelTime__min) AS SumTravelTime,
-               SUM( Distance__km  ) AS SumDistance,
-               SUM( VariableCosts__Eur * trips_{0}.NumberOfTrips) AS SumVariableCostsTrips,
-               SUM( FixedCosts__Eur * trips_{0}.NumberOfTrips   ) AS SumFixedCostsTrips,
-               SUM( FixedCosts__Eur * trips_{0}.NumberOfTrips  +  VariableCosts__Eur * trips_{0}.NumberOfTrips) AS SumTotalCostsTrips,
-               SUM( TravelTime__min * trips_{0}.NumberOfTrips   ) AS SumTravelTimeTrips,
-               SUM( Distance__km * trips_{0}.NumberOfTrips      ) AS SumDistanceTrips,
-               SUM( trips_{0}.NumberOfTrips                     ) AS SumNumberOfTrips,
-               COUNT(*) AS count
-        FROM route_statistics_{0}
-        LEFT JOIN trips_{0} ON route_statistics_{0}.TripID = trips_{0}.ID
-        GROUP BY DATE(trips_{0}.DateTime)
-        """.format(self.scenarioID)
-        df = pd.read_sql(sql, self.connection)
+        sql = f"""
+        SELECT DATE(trips.DateTime) AS date,
+               COUNT(*) AS count,
+               {self.compute_route_statistics}
+        FROM route_statistics_{self.scenarioID} AS route_statistics
+        LEFT JOIN trips_{self.scenarioID} AS trips ON route_statistics.TripID = trips.ID
+        GROUP BY DATE(trips.DateTime)
+        """
+        df = self.sql(sql)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
         return df
@@ -277,7 +264,7 @@ class pyBIVAS:
         WHERE RouteIndex=0
         GROUP BY DATE(trips_{0}.DateTime)
         """.format(self.scenarioID)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
         return df
@@ -292,7 +279,7 @@ class pyBIVAS:
         WHERE SeasonID=1
         GROUP BY ID
         """
-        return pd.read_sql(sql, self.connection)
+        return self.sql(sql)
 
     def sqlWaterDepthForArcIDs(self, ArcIDs):
         """
@@ -300,12 +287,12 @@ class pyBIVAS:
         """
 
         ArcIDsStr = str(ArcIDs).strip('[]')
-        sql = """
+        sql = f"""
         SELECT SeasonID, WaterDepth__m, ArcID
         FROM water_scenario_values
-        WHERE ArcID IN ({}) AND WaterScenarioID={}
-        """.format(ArcIDsStr, self.WaterScenarioID)
-        df = pd.read_sql(sql, self.connection)
+        WHERE ArcID IN ({ArcIDsStr}) AND WaterScenarioID={self.WaterScenarioID}
+        """
+        df = self.sql(sql)
         df = df.set_index('SeasonID')
 
         gp = df.groupby('ArcID')
@@ -329,7 +316,7 @@ class pyBIVAS:
         WHERE ArcID IN ({1})
         GROUP BY DATE(trips_{0}.DateTime), ARCID
         """.format(self.scenarioID, ArcIDsStr)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
 
@@ -371,9 +358,9 @@ class pyBIVAS:
                 sql_groupby += 'Days, '
 
             if 'NSTR' in group_by:
-                sql_select += 'nstr_types.Code AS "NSTR",'
-                sql_groupby += 'NstrTypeCode, '
-                sql_leftjoin += 'LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code '
+                sql_select += 'nstr_mapping.GroupCode AS "NSTR",'
+                sql_groupby += 'NstrGoodsClassification, '
+                sql_leftjoin += 'LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode '
 
             if 'Vorm' in group_by:
                 sql_select += 'appearance_types.Description AS "Vorm",'
@@ -424,7 +411,7 @@ class pyBIVAS:
         GROUP BY {sql_groupby}
         """
 
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
 
         # Use short strings for NSTR classes
         df = df.replace({'NSTR': self.NSTR_shortnames})
@@ -444,11 +431,16 @@ class pyBIVAS:
             df = df.set_index(group_by).sort_index()
         return df
 
-    def sqlArcDetails(self, arcID, extended=True):
+    def sqlArcDetails(self, arcID, extended=True, group_by=None):
         """
         This function requests all vessels passing a specified arc with
         various information about those vessels
+
+        NOTE: Not all columns give proper info when using groupby
         """
+        if not group_by:
+            group_by = 'trips.ID'
+
         if extended:
             sql = f"""
             SELECT trips.*,
@@ -458,36 +450,42 @@ class pyBIVAS:
                    ship_types.Description AS ship_types_Description,
                    cemt_class.ID AS cemt_class_ID,
                    cemt_class.Description AS cemt_class_Description,
-                   nstr_types.Code AS nstr_Short,
-                   nstr_types.Description AS nstr_Description,
+                   nstr_mapping.GroupCode AS NSTR,
+                   nstr_mapping.Description AS nstr_Description,
                    appearance_types.Description AS appearance_types_Description,
                    dangerous_goods_levels.Description AS dangerous_goods_levels_Description,
                    {self.compute_route_statistics}
             FROM routes_{self.scenarioID} AS routes
             LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
             LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
-            LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+            LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
             LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
             LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
             LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
             LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
             LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
             WHERE ArcID = {arcID}
-            GROUP BY trips.ID
+            GROUP BY {group_by}
             """
         else:
-            sql = """
-            SELECT routes.*
-            FROM routes_{0} AS routes
-            WHERE ArcID = {1}
-            """.format(self.scenarioID, arcID)
+            sql = f"""
+            SELECT trips.*,
+                   routes.OriginalArcDirection
+            FROM routes_{self.scenarioID} AS routes
+            LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
+            WHERE ArcID = {arcID}
+            """
 
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
 
-        df = df.replace({'nstr_Short': self.NSTR_shortnames})
+        df = df.replace({'NSTR': self.NSTR_shortnames})
         df = df.replace({'appearance_types_Description': self.appeareance_rename})
 
-        df = df.set_index('ID')
+        if group_by == 'trips.ID':
+            df = df.set_index('ID')
+        else:
+            df = df.set_index(group_by)
+
         df['DateTime'] = pd.to_datetime(df['DateTime'])
         df = df.drop(['SeasonID', 'ShipTypeID', 'DangerousGoodsLevelID', 'LoadTypeID'], axis=1)
         return df
@@ -518,17 +516,17 @@ class pyBIVAS:
         SELECT trips.*,
                ship_types.Label,
                ship_types.Description,
-               nstr_types.Description AS nstr_description,
+               nstr_mapping.Description AS nstr_description,
                appearance_types.Description AS appear_description,
                dangerous_goods_levels.Description AS dangerous_description
         FROM trips_{0} AS trips
         LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+        LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
         """.format(self.scenarioID)
 
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         df = df.set_index('ID')
         df['DateTime'] = pd.to_datetime(df['DateTime'])
         df = df.drop(['SeasonID', 'ShipTypeID', 'DangerousGoodsLevelID', 'LoadTypeID'], axis=1)
@@ -542,22 +540,15 @@ class pyBIVAS:
 
         listOfTrips = ",".join(str(t) for t in tripsArray)
 
-        sql = """
+        sql = f"""
         SELECT trips.ID,
-               (trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
-               (trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)",
-               (trips.TwentyFeetEquivalentUnits * trips.NumberOfTrips) AS "Totale TEU (-)",
-               (routeStats.Distance__km * trips.NumberOfTrips) AS "Totale Afstand (km)",
-               (routeStats.TravelTime__min  * trips.NumberOfTrips) AS "Totale Reistijd (min)",
-               (routeStats.VariableCosts__Eur  * trips.NumberOfTrips) + (routeStats.FixedCosts__Eur  * trips.NumberOfTrips) AS "Totale Vaarkosten (EUR)",
-               (routeStats.VariableCosts__Eur * trips.NumberOfTrips) AS "Totale Variabele Vaarkosten (EUR)",
-               (routeStats.FixedCosts__Eur * trips.NumberOfTrips) AS "Totale Vaste Vaarkosten (EUR)",
-               ((trips.TotalWeight__t * routeStats.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
-            FROM trips_{0} AS trips
-            LEFT JOIN route_statistics_{0} AS routeStats ON routeStats.TripID = trips.ID
-            WHERE trips.ID IN ({1})
-        """.format(self.scenarioID, listOfTrips)
-        df2 = pd.read_sql(sql, self.connection)
+               {self.compute_route_statistics}
+            FROM trips_{self.scenarioID} AS trips
+            LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = trips.ID
+            WHERE trips.ID IN ({listOfTrips})
+            GROUP BY trips.ID
+        """
+        df2 = self.sql(sql)
         df2 = df2.set_index('ID')
         return df2
 
@@ -570,6 +561,85 @@ class pyBIVAS:
         FROM arc_usage_statistics_details_{0} AS arcStats
         GROUP BY ArcID
         """.format(self.scenarioID)
+        df = self.sql(sql)
+        df = df.set_index('ArcID')
+        return df
+
+    def routesFromArc(self, arcID, not_passing_arcID=None):
+        """
+        For a given arcID (or list), this function analyses how all trips passing this Arc are distributed over the network.
+        By given an arcID (or list0 as not_passing_arcID it is returning all trips that do pass arcID, but not pass not_passing_arcID.
+
+        NOTE: It can happen that multiple ArcID are given, and one should expect that all have equal (maximum) trip count.
+        However, in BIVAS/IVS it can happen that a ship passes and arc multiple times. This can result in irregularities.
+        """
+        if not not_passing_arcID and isinstance(arcID, int):
+            # All routes of ships passing 1 point
+            sql = f"""
+            SELECT routes.ArcID AS ArcID,
+            COUNT(*) AS "Aantal"
+            FROM routes_{self.scenarioID} AS routes_passing_arc
+            INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+            WHERE routes_passing_arc.ArcID = {arcID}
+            GROUP BY routes.ArcID
+            """
+        elif isinstance(arcID, int) and isinstance(not_passing_arcID, int):
+            # All routes of ships passing 1 point and not passing another point
+
+            sql = f"""
+            SELECT routes.ArcID AS ArcID,
+                COUNT(*) AS "Aantal"
+            FROM routes_{self.scenarioID} AS routes_passing_arc
+            LEFT JOIN
+                (SELECT ArcID, TripID FROM routes_{self.scenarioID} WHERE ArcID = {not_passing_arcID})
+                AS routes_passing_arc2 ON routes_passing_arc.TripID = routes_passing_arc2.TripID
+            INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+            WHERE routes_passing_arc.ArcID = {arcID}
+                AND routes_passing_arc2.ArcID IS NULL
+            GROUP BY routes.ArcID"""
+        else:
+            # Either one of the input is a list of arcs. Lets make sure both are
+            if not isinstance(arcID, list): arcID = [arcID]
+            if not isinstance(not_passing_arcID, list):
+                if isinstance(not_passing_arcID, int):
+                    not_passing_arcID = [not_passing_arcID]
+                else:
+                    not_passing_arcID = []
+
+            leftjoins = ''
+            where = ''
+            join_id = 1
+
+            for a in not_passing_arcID:
+                join_id += 1
+                leftjoins += f"""
+                    LEFT JOIN
+                    (SELECT ArcID, TripID FROM routes_{self.scenarioID} WHERE ArcID = {a})
+                    AS routes_passing_arc{join_id} ON routes_passing_arc.TripID = routes_passing_arc{join_id}.TripID
+                """
+
+                where += f"""
+                    AND routes_passing_arc{join_id}.ArcID IS NULL
+                """
+
+            for a in arcID[1:]:
+                join_id += 1
+                leftjoins += f"""
+                    INNER JOIN
+                    (SELECT ArcID, TripID FROM routes_{self.scenarioID} WHERE ArcID = {a})
+                    AS routes_passing_arc{join_id} ON routes_passing_arc.TripID = routes_passing_arc{join_id}.TripID
+                """
+
+            sql = f"""
+            SELECT routes.ArcID AS ArcID,
+                COUNT(*) AS "Aantal"
+            FROM routes_{self.scenarioID} AS routes_passing_arc
+            {leftjoins}
+            INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+            WHERE routes_passing_arc.ArcID = {arcID[0]}
+            {where}
+            GROUP BY routes.ArcID"""
+
         df = self.sql(sql)
         df = df.set_index('ArcID')
         return df
@@ -590,13 +660,13 @@ class pyBIVAS:
         FROM arcs
         ORDER BY arcs.ID
         """
-        arcs = pd.read_sql(sql, self.connection)
+        arcs = self.sql(sql)
 
         sql = """
         SELECT *
         FROM nodes
         """
-        nodes = pd.read_sql(sql, self.connection)
+        nodes = self.sql(sql)
         nodes = nodes.set_index('ID')
 
         G = nx.from_pandas_edgelist(
@@ -652,14 +722,14 @@ class pyBIVAS:
 
         sql = """
         SELECT (route_statistics_{0}.TravelTime__min - route_statistics_{1}.TravelTime__min) AS ChangeInTravelTime,
-                trips_{0}.NstrTypeCode AS NstrTypeCode,
+                trips_{0}.NstrGoodsClassification AS NstrTypeCode,
                 trips_{0}.TotalWeight__t * trips_{0}.NumberOfTrips AS TotalWeight__t,
                 trips_{0}.NumberOfTrips AS nTrips
         FROM route_statistics_{0}
         LEFT JOIN route_statistics_{1} ON route_statistics_{0}.TripID = route_statistics_{1}.TripID
         LEFT JOIN trips_{0} ON route_statistics_{0}.TripID = trips_{0}.ID
         """.format(casescenario, self.scenarioID)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         return df
 
     def sqlCompareScenariosTrips(self, casescenario):
@@ -671,7 +741,7 @@ class pyBIVAS:
         RIGHT JOIN route_statistics_{0} ON route_statistics_{0}.TripID = trips_{0}.ID
         LEFT JOIN trips_{1} ON trips_{0}.ID = trips_{1}.ID
         """.format(casescenario, self.scenarioID)
-        df = pd.read_sql(sql, self.connection)
+        df = self.sql(sql)
         return df
 
     """
@@ -701,7 +771,7 @@ class pyBIVAS:
         WHERE BS.BranchID = {0}
         ORDER BY arcs.ID
         """.format(self.scenarioID)
-        arcs = pd.read_sql(sql, self.connection).set_index('ID')
+        arcs = self.sql(sql).set_index('ID')
 
         arcs['XM'] = (arcs['X1'] + arcs['X2']) / 2
         arcs['YM'] = (arcs['Y1'] + arcs['Y2']) / 2
@@ -726,7 +796,7 @@ class pyBIVAS:
         SELECT *
         FROM nodes
         """
-        nodes = pd.read_sql(sql, self.connection).set_index('ID')
+        nodes = self.sql(sql).set_index('ID')
         # nodes = nodes.set_index('ID')
         nodes['geometry'] = nodes.apply(
             lambda z: Point(z.XCoordinate, z.YCoordinate), axis=1)
@@ -754,7 +824,7 @@ class pyBIVAS:
         WHERE TripID = {1}
         ORDER BY RouteIndex
         """.format(self.scenarioID, routeID)
-        route = pd.read_sql(sql, self.connection)
+        route = self.sql(sql)
         route = route.join(self.arcs, on='ArcID')
         route = geopandas.GeoDataFrame(route)
         return route
@@ -766,24 +836,24 @@ class pyBIVAS:
         sql = """
         SELECT  trips.*,
                 route.*,
-                nstr_types.Description AS nstr_description,
+                nstr_mapping.Description AS nstr_description,
                 appearance_types.Description AS appear_description,
                 ship_types.Label AS ship_label,
                 ship_types.Description as ship_description,
                 dangerous_goods_levels.Description AS dangerous_description
         FROM route_statistics_{0} AS route
         LEFT JOIN trips_{0} AS trips ON route.TripID = trips.ID
-        LEFT JOIN nstr_types ON trips.NstrTypeCode = nstr_types.Code
+        LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
         WHERE TripID = {1}
         """.format(self.scenarioID, routeID)
-        routestats = pd.read_sql(sql, self.connection)
+        routestats = self.sql(sql)
         return routestats
 
     # Get registered route of reference trips
-    def sqlReferenceRoute(self, routeID, route, ReferenceSetID=3):
+    def sqlReferenceRoute(self, routeID, route):
         """
         Validate the route of a routeID versus the reference tripset
 
@@ -802,8 +872,8 @@ class pyBIVAS:
         WHERE ReferenceSetID = {0}
         AND TripID = {1}
         ORDER BY DateTime
-        """.format(ReferenceSetID, routeID)
-        referencestrips = pd.read_sql(sql, self.connection)
+        """.format(self.ReferenceTripSetID, routeID)
+        referencestrips = self.sql(sql)
         referencestrips = referencestrips.join(
             self.arcs, on='ArcID', rsuffix='_r')
         referencestrips = geopandas.GeoDataFrame(referencestrips)
@@ -832,6 +902,7 @@ class pyBIVAS:
 
     def sql(self, sql):
         """ Execute sql on loaded database"""
+        logger.debug(f'Executing sql syntax: {sql}')
         return pd.read_sql(sql, self.connection)
 
     # Functions without SQL

@@ -6,15 +6,14 @@
 import unittest
 from pathlib import Path
 from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
-import shutil
+
 
 class test_pyBIVAS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
 
-    skipSlowRuns = True
-    # skipSlowRuns=("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true")
+    skipSlowRuns = False
 
-    database_file = Path('resources/bivas_LSM_2018_NWMinput_lsm2bivas_v2018_02.db')
+    database_file = Path(r'resources/Bivas_2018_v2.db')
 
     arcID = 6332
     arcIDs = [6332, 9204, 8886]
@@ -34,7 +33,10 @@ class test_pyBIVAS(unittest.TestCase):
 
         # Connect to database
         self.BIVAS = pyBIVAS(self.database_file)
-        self.BIVAS.set_scenario(47)
+        self.BIVAS.set_scenario()
+
+        if not self.exportdir.exists():
+            self.exportdir.mkdir()
 
     def test_overviewScenarios(self):
         df = self.BIVAS.sqlOverviewOfScenarios()
@@ -85,6 +87,10 @@ class test_pyBIVAS(unittest.TestCase):
         df = self.BIVAS.sqlArcDetails(self.arcID)  # list of trips (with details) on given arc
         print(df.head(10).to_string())
 
+    def test_sqlArcDetails2(self):
+        df = self.BIVAS.sqlArcDetails(self.arcID, extended=False)  # list of trips (without details) on given arc
+        print(df.head(10).to_string())
+
     def test_sqlRouteStats(self):
         df = self.BIVAS.sqlRouteStats(self.routeID)  # Stats based on table route_statistics
         print(df.head(10).to_string())
@@ -117,7 +123,8 @@ class test_pyBIVAS(unittest.TestCase):
         print(df.head(10).to_string())
 
     def test_export_BIVAS_arcs(self):
-        arcs = self.BIVAS.sqlArcs(outputfileshape=self.exportdir / 'arcs.shp', outputfilecsv=self.exportdir / 'arcs.csv')
+        arcs = self.BIVAS.sqlArcs(outputfileshape=self.exportdir / 'arcs.shp',
+                                  outputfilecsv=self.exportdir / 'arcs.csv')
         print(arcs.head(10).to_string())
 
     def test_findPathInNetworkx(self):
@@ -134,6 +141,17 @@ class test_pyBIVAS(unittest.TestCase):
 
         ship_types = ship_types.join(cemt_class, on='CEMTTypeID', rsuffix='_CEMT').set_index('Label')
         print(ship_types.head(10).to_string())
+
+    def test_routesFromArc(self):
+        df = self.BIVAS.routesFromArc(self.arcID)
+        print(df.head(10).to_string())
+
+    def test_routesFromArc2(self):
+        if self.skipSlowRuns:
+            self.skipTest('Skipping because this test takes very long')
+
+        df = self.BIVAS.routesFromArc(self.arcIDs[:2], not_passing_arcID=self.arcIDs[-1])
+        print(df.head(10).to_string())
 
 
 if __name__ == '__main__':
