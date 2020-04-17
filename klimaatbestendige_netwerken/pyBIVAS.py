@@ -118,6 +118,8 @@ class pyBIVAS:
                                                     'TrafficScenarioID']
         self.WaterScenarioID = scenarioOverview.loc[self.scenarioID,
                                                     'WaterScenarioID']
+        self.ReferenceTripSetID = scenarioOverview.loc[self.scenarioID,
+                                                    'ReferenceTripSetID']
 
     def sqlOverviewOfScenarios(self):
         """Overview of all scenarios with parameters"""
@@ -851,7 +853,7 @@ class pyBIVAS:
         return routestats
 
     # Get registered route of reference trips
-    def sqlReferenceRoute(self, routeID, route, ReferenceSetID=3):
+    def sqlReferenceRoute(self, routeID, route):
         """
         Validate the route of a routeID versus the reference tripset
 
@@ -870,7 +872,7 @@ class pyBIVAS:
         WHERE ReferenceSetID = {0}
         AND TripID = {1}
         ORDER BY DateTime
-        """.format(ReferenceSetID, routeID)
+        """.format(self.ReferenceTripSetID, routeID)
         referencestrips = self.sql(sql)
         referencestrips = referencestrips.join(
             self.arcs, on='ArcID', rsuffix='_r')
