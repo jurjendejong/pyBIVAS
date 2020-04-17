@@ -50,6 +50,14 @@ class pyBIVAS_plot(pyBIVAS):
         'Kanaal Zuid-Beveland': 8361
     }
 
+    # Added some more arcs
+    Arcs_overig = {
+        'Ondiepte St. Andries': 7362,
+        'Ondiepte Nijmegen': 6320,
+        'Kanaal van St. Andries': 7378,
+        'Prins Bernhardsluizen in Betuwepand': 1705
+    }
+
     def plot_Trips_Arc_all(self):
         for label, arcID in self.Arcs.items():
             self.plot_Trips_Arc(arcID, label, y_unit='Totale Vaarkosten (EUR)', stacking='NSTR')
