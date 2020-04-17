@@ -6,7 +6,7 @@
 import unittest
 from pathlib import Path
 from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
-import shutil
+
 
 class test_pyBIVAS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
@@ -123,7 +123,8 @@ class test_pyBIVAS(unittest.TestCase):
         print(df.head(10).to_string())
 
     def test_export_BIVAS_arcs(self):
-        arcs = self.BIVAS.sqlArcs(outputfileshape=self.exportdir / 'arcs.shp', outputfilecsv=self.exportdir / 'arcs.csv')
+        arcs = self.BIVAS.sqlArcs(outputfileshape=self.exportdir / 'arcs.shp',
+                                  outputfilecsv=self.exportdir / 'arcs.csv')
         print(arcs.head(10).to_string())
 
     def test_findPathInNetworkx(self):
@@ -151,6 +152,7 @@ class test_pyBIVAS(unittest.TestCase):
 
         df = self.BIVAS.routesFromArc(self.arcIDs[:2], not_passing_arcID=self.arcIDs[-1])
         print(df.head(10).to_string())
+
 
 if __name__ == '__main__':
     unittest.main()

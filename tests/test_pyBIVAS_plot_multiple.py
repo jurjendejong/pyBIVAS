@@ -3,8 +3,8 @@ from klimaatbestendige_netwerken.pyBIVAS_plot_multiple import pyBIVAS_plot_compa
 from klimaatbestendige_netwerken.pyBIVAS_plot import pyBIVAS_plot
 from pathlib import Path
 
-class TestpyBIVAS_plot(TestCase):
 
+class TestpyBIVAS_plot(TestCase):
     skipSlowRuns = True
 
     database_file_1 = Path(r'resources/Bivas_2018_v2.db')
@@ -18,7 +18,7 @@ class TestpyBIVAS_plot(TestCase):
         if not self.database_file_1.exists() or not self.database_file_2.exists():
             self.skipTest('Database could not be found')
 
-        self.B = pyBIVAS_plot_compare(BIVAS_simulations = {
+        self.B = pyBIVAS_plot_compare(BIVAS_simulations={
             'Sim1': self.database_file_1,
             'Sim2': self.database_file_2
         })
@@ -38,4 +38,3 @@ class TestpyBIVAS_plot(TestCase):
         self.B.plot_routes(routes='larger', limit=5)
         self.B.plot_routes(routes=355945, limit=5)
         self.B.plot_routes(routes=[355945, 154544], limit=5)
-

@@ -59,7 +59,6 @@ class pyBIVAS:
         SUM((trips.TotalWeight__t * route_statistics.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
     """
 
-
     def __init__(self, databasefile=None):
         """
         Initialise class
@@ -119,7 +118,7 @@ class pyBIVAS:
         self.WaterScenarioID = scenarioOverview.loc[self.scenarioID,
                                                     'WaterScenarioID']
         self.ReferenceTripSetID = scenarioOverview.loc[self.scenarioID,
-                                                    'ReferenceTripSetID']
+                                                       'ReferenceTripSetID']
 
     def sqlOverviewOfScenarios(self):
         """Overview of all scenarios with parameters"""
@@ -134,7 +133,6 @@ class pyBIVAS:
         df = self.sql(sql)
         df = df.set_index('ID')
         return df
-
 
     def sqlAppearanceTypes(self, rename_to_Leeg=True):
         sql = """SELECT * FROM appearance_types ORDER BY Id"""
@@ -603,8 +601,10 @@ class pyBIVAS:
             # Either one of the input is a list of arcs. Lets make sure both are
             if not isinstance(arcID, list): arcID = [arcID]
             if not isinstance(not_passing_arcID, list):
-                if isinstance(not_passing_arcID, int): not_passing_arcID = [not_passing_arcID]
-                else: not_passing_arcID=[]
+                if isinstance(not_passing_arcID, int):
+                    not_passing_arcID = [not_passing_arcID]
+                else:
+                    not_passing_arcID = []
 
             leftjoins = ''
             where = ''

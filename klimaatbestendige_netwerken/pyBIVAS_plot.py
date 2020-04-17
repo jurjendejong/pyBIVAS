@@ -5,7 +5,6 @@ This function contains generic plotting functions to go with the module pyBIVAS
 from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -148,8 +147,6 @@ class pyBIVAS_plot(pyBIVAS):
 
         plt.close()
 
-
-
     def plot_Vrachtanalyse(self):
         figdir = self.outputdir / 'figures_Vrachtanalyse'
         if not figdir.exists():
@@ -234,13 +231,11 @@ class pyBIVAS_plot(pyBIVAS):
         dfArcs = pd.concat(dfArcs, axis=1, sort=False)[arc_order]
         dfArcs = dfArcs.sort_index(axis=0)
 
-
         dfArcs = dfArcs.swaplevel(axis=1)
-
 
         # Plot vaarkosten
         (dfArcs['Totale Vaarkosten (EUR)'] / 1e9).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
-                                                             cmap='tab20c')
+                                                                   cmap='tab20c')
         plt.grid()
         plt.xlabel('totale vaarkosten (miljarden EUR)')
         plt.legend(loc='center right', frameon=True)
@@ -253,7 +248,7 @@ class pyBIVAS_plot(pyBIVAS):
 
         # Plot vracht
         (dfArcs["Totale Vracht (ton)"] / 1e6).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
-                                                         cmap='tab20c')
+                                                               cmap='tab20c')
         plt.grid()
         plt.xlabel('totale vracht (mln ton)')
         plt.legend(loc='center right', frameon=True)
@@ -265,7 +260,7 @@ class pyBIVAS_plot(pyBIVAS):
 
         # Plot aantal vaarbeweingen
         dfArcs["Aantal Vaarbewegingen (-)"].transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
-                                                         cmap='tab20c')
+                                                             cmap='tab20c')
         plt.grid()
         plt.xlabel('Aantal vaarbewegingen')
         plt.legend(loc='center right', frameon=True)
@@ -464,8 +459,8 @@ class pyBIVAS_plot(pyBIVAS):
         plt.savefig(figdir / f'Shipping_types_{label}.png', dpi=300, bbox_inches='tight')
         plt.close()
 
-class IVS90_analyse(pyBIVAS_plot):
 
+class IVS90_analyse(pyBIVAS_plot):
     outputdir = Path('.')
 
     def __init__(self,

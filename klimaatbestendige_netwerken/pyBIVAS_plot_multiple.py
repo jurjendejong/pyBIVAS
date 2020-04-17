@@ -1,6 +1,5 @@
 from klimaatbestendige_netwerken.pyBIVAS_plot import pyBIVAS_plot as pyBIVAS
 import pandas as pd
-import numpy as np
 import geopandas
 import gc
 import random

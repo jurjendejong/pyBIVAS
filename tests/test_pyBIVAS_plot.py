@@ -3,8 +3,8 @@ from klimaatbestendige_netwerken.pyBIVAS_plot import pyBIVAS_plot as pyBIVAS
 from klimaatbestendige_netwerken.pyBIVAS_plot import IVS90_analyse
 from pathlib import Path
 
-class TestpyBIVAS_plot(TestCase):
 
+class TestpyBIVAS_plot(TestCase):
     skipSlowRuns = True
     # skipSlowRuns=("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true")
 
@@ -65,11 +65,15 @@ class Test_IVS90_analyse(TestCase):
 
     def test_plot_CountingPointsForYear(self):
         self.BIVAS.plot_CountingPointsForYear()
+
     def test_plot_CEMTclassesForYear(self):
         self.BIVAS.plot_CEMTclassesForYear()
+
     def test_plot_YearlyChanges_Timeseries(self):
         self.BIVAS.plot_YearlyChanges_Timeseries()
+
     def test_plot_YearlyChangesCEMT(self):
         self.BIVAS.plot_YearlyChangesCEMT()
+
     def test_plot_YearlyChangesRWSklasse(self):
         self.BIVAS.plot_YearlyChangesRWSklasse()
