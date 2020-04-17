@@ -565,19 +565,79 @@ class pyBIVAS:
         df = df.set_index('ArcID')
         return df
 
-    def routesFromArc(self, arcID):
+    def routesFromArc(self, arcID, not_passing_arcID=None):
         """
-        For a given arcID, this function analyses how all trips passing this Arc are distributed over the network.
-        """
+        For a given arcID (or list), this function analyses how all trips passing this Arc are distributed over the network.
+        By given an arcID (or list0 as not_passing_arcID it is returning all trips that do pass arcID, but not pass not_passing_arcID.
 
-        sql = f"""
-        SELECT routes.ArcID AS ArcID,
-        COUNT(*) AS "Aantal"
-        FROM routes_{self.scenarioID} AS routes_passing_arc
-        INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
-        WHERE routes_passing_arc.ArcID = {arcID}
-        GROUP BY routes.ArcID
+        NOTE: It can happen that multiple ArcID are given, and one should expect that all have equal (maximum) trip count.
+        However, in BIVAS/IVS it can happen that a ship passes and arc multiple times. This can result in irregularities.
         """
+        if not not_passing_arcID and isinstance(arcID, int):
+            # All routes of ships passing 1 point
+            sql = f"""
+            SELECT routes.ArcID AS ArcID,
+            COUNT(*) AS "Aantal"
+            FROM routes_{self.scenarioID} AS routes_passing_arc
+            INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+            WHERE routes_passing_arc.ArcID = {arcID}
+            GROUP BY routes.ArcID
+            """
+        elif isinstance(arcID, int) and isinstance(not_passing_arcID, int):
+            # All routes of ships passing 1 point and not passing another point
+
+            sql = f"""
+            SELECT routes.ArcID AS ArcID,
+                COUNT(*) AS "Aantal"
+            FROM routes_{self.scenarioID} AS routes_passing_arc
+            LEFT JOIN
+                (SELECT ArcID, TripID FROM routes_{self.scenarioID} WHERE ArcID = {not_passing_arcID})
+                AS routes_passing_arc2 ON routes_passing_arc.TripID = routes_passing_arc2.TripID
+            INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+            WHERE routes_passing_arc.ArcID = {arcID}
+                AND routes_passing_arc2.ArcID IS NULL
+            GROUP BY routes.ArcID"""
+        else:
+            # Either one of the input is a list of arcs. Lets make sure both are
+            if not isinstance(arcID, list): arcID = [arcID]
+            if not isinstance(not_passing_arcID, list):
+                if isinstance(not_passing_arcID, int): not_passing_arcID = [not_passing_arcID]
+                else: not_passing_arcID=[]
+
+            leftjoins = ''
+            where = ''
+            join_id = 1
+
+            for a in not_passing_arcID:
+                join_id += 1
+                leftjoins += f"""
+                    LEFT JOIN
+                    (SELECT ArcID, TripID FROM routes_{self.scenarioID} WHERE ArcID = {a})
+                    AS routes_passing_arc{join_id} ON routes_passing_arc.TripID = routes_passing_arc{join_id}.TripID
+                """
+
+                where += f"""
+                    AND routes_passing_arc{join_id}.ArcID IS NULL
+                """
+
+            for a in arcID[1:]:
+                join_id += 1
+                leftjoins += f"""
+                    INNER JOIN
+                    (SELECT ArcID, TripID FROM routes_{self.scenarioID} WHERE ArcID = {a})
+                    AS routes_passing_arc{join_id} ON routes_passing_arc.TripID = routes_passing_arc{join_id}.TripID
+                """
+
+            sql = f"""
+            SELECT routes.ArcID AS ArcID,
+                COUNT(*) AS "Aantal"
+            FROM routes_{self.scenarioID} AS routes_passing_arc
+            {leftjoins}
+            INNER JOIN routes_{self.scenarioID} AS routes ON routes_passing_arc.TripID = routes.TripID
+            WHERE routes_passing_arc.ArcID = {arcID[0]}
+            {where}
+            GROUP BY routes.ArcID"""
+
         df = self.sql(sql)
         df = df.set_index('ArcID')
         return df
