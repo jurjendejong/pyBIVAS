@@ -465,18 +465,25 @@ class IVS90_analyse(pyBIVAS_plot):
 
     def __init__(self,
                  databasefile=None,
-                 label_traffic_scenario=[2011, 2013, 2014, 2016, 2017, 2018],
+                 traffic_scenario_ids=None,
+                 traffic_scenario_labels=[2011, 2013, 2014, 2016, 2017, 2018],
                  reference_trip_ids=[1, 2, 3, 4, 5, 6]
                  ):
         super().__init__(databasefile=databasefile)
 
         sql = """SELECT * FROM traffic_scenarios"""
-        traffic_scenarios = self.sql(sql)
+        traffic_scenarios = self.sql(sql).set_index('ID')
+
+        if traffic_scenario_ids:
+            traffic_scenarios = traffic_scenarios.loc[traffic_scenario_ids]
 
         sql = """SELECT * FROM reference_trip_sets"""
         reference_trip_sets = self.sql(sql).set_index('ID')
 
-        traffic_scenarios.index = label_traffic_scenario
+        if traffic_scenario_labels:
+            traffic_scenarios.index = traffic_scenario_labels
+        else:
+            traffic_scenarios.index = traffic_scenarios['Description']
 
         traffic_scenarios['reference_trips_sets_id'] = reference_trip_ids
         traffic_scenarios = traffic_scenarios.join(reference_trip_sets, on='reference_trips_sets_id',
@@ -484,7 +491,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         self.traffic_scenarios = traffic_scenarios
 
-        self.cemt_order = self.sql("""SELECT * FROM cemt_class ORDER BY Id""")['Description']
+        self.cemt_order = self.sqlCEMTclass()['Description']
         self.ship_types_order = self.sqlShipTypes()['Description']
 
     # Jaarlijkse variatie
