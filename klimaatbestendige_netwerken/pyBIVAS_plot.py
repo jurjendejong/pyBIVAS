@@ -371,7 +371,7 @@ class pyBIVAS_plot(pyBIVAS):
         plt.savefig(figdir / f'Beladingsgraad_{label}.svg', bbox_inches='tight')
         plt.close()
 
-    def plot_tijdseries_vloot(self, arcID, label, time_start=50, time_end=110):
+    def plot_tijdseries_vloot(self, arcID, label, time_start='2018-03', time_end='2018-06'):
         figdir = self.outputdir / 'figures_Tijdseries_vloot'
         if not figdir.exists():
             figdir.mkdir()
@@ -379,8 +379,11 @@ class pyBIVAS_plot(pyBIVAS):
         df = self.sqlArcDetails(arcID)
 
         ordered_ship_types, data_merge_small_ships = self.remove_small_ships(df)
-        data = data_merge_small_ships.groupby(['DayOfYear', 'ship_types_Label']).count()['Depth__m'].unstack()[
+        data = data_merge_small_ships.groupby(['DateTime', 'ship_types_Label']).count()['Depth__m'].unstack()[
             ordered_ship_types].fillna(0)
+
+        fullyear = pd.date_range('01-01-{}'.format(data.index[0].year), '31-12-{}'.format(data.index[0].year))
+        data = data.reindex(fullyear, fill_value=0)
 
         # First some plots of timeseries of the ships passing
         lines_per_plot = 5
@@ -392,15 +395,14 @@ class pyBIVAS_plot(pyBIVAS):
             ax[ii].grid()
             ax[ii].set_ylabel('Aantal vaarbewegingen')
             ax[ii].set_xlabel('')
-        plt.xlim(1, 365)
-        plt.xlabel('Dag van het jaar')
+        # plt.xlim(1, 365)
+        plt.xlabel('')
 
         data.to_csv(figdir / f'Tijdserie_shipping_types_{label}.csv')
         plt.savefig(figdir / f'Tijdserie_shipping_types_{label}.png', dpi=300, bbox_inches='tight')
 
         # Normalised timeseries
-        ndays = time_end - time_start
-        average_daily = data.loc[time_start:time_end].sum(axis=0) / ndays
+        average_daily = data[time_start:time_end].mean(axis=0)
         data_normalised = data.divide(average_daily, axis=1)
 
         lines_per_plot = 5
@@ -412,9 +414,8 @@ class pyBIVAS_plot(pyBIVAS):
             ax[ii].grid()
             ax[ii].set_ylabel('Genormaliseerde \n aantal vaarbewegingen')
             ax[ii].set_xlabel('')
-        plt.ylim(0, 7)
-        plt.xlim(1, 365)
-        plt.xlabel('Dag van het jaar')
+        # plt.xlim(1, 365)
+        plt.xlabel('')
 
         plt.savefig(figdir / f'Tijdserie_shipping_types_{label}_normalised.png', dpi=300, bbox_inches='tight')
 
@@ -472,7 +473,7 @@ class IVS90_analyse(pyBIVAS_plot):
         super().__init__(databasefile=databasefile)
 
         sql = """SELECT * FROM traffic_scenarios"""
-        traffic_scenarios = self.sql(sql).set_index('ID')
+        traffic_scenarios = self.sql(sql)
 
         if traffic_scenario_ids:
             traffic_scenarios = traffic_scenarios.loc[traffic_scenario_ids]
@@ -766,6 +767,153 @@ class IVS90_analyse(pyBIVAS_plot):
         dfs.to_csv(figdir / 'HistorischVerloopYearRWSklasse_{}.csv'.format(telpunt))
 
         plt.close()
+
+    def plot_timeseries_node(self, jaar=2011, NodeID=21639, label=None):
+        """
+        Create timeserie of the number of ships departing and arriving at given node in given year.
+
+        jaar: labeled traffic scenario
+        nodeId: Node in BIVAS
+        label: give label for plot and file. Leave empty to autogenerate label from neighbouring arc
+
+        """
+        figdir = self.outputdir / 'figures_timeseries_node'
+        if not figdir.exists():
+            figdir.mkdir()
+
+        logger.info(f'Plotting timeseries_node voor node: {NodeID}, jaar: {jaar}')
+
+        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+
+        dfs = {}
+        for d in ['Origin', 'Destination']:
+            sql = f"""
+                    SELECT
+                    DATE(trips.DateTime) AS "Days",
+                    count(*) AS nTrips
+                    FROM trips
+                    WHERE TrafficScenarioID={trafficScenarioId}
+                        AND {d}TripEndPointNodeID={NodeID}
+                    GROUP BY "Days"
+                    """
+            df = self.sql(sql)
+
+            # Format data
+            df['Days'] = pd.to_datetime(df['Days'])
+            df = df.set_index('Days')
+            df = df['nTrips']
+
+            fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
+
+            dfs[d] = df.reindex(fullyear, fill_value=0)
+
+        df = pd.concat(dfs, axis=1)
+
+        rename_mapper = {'Origin': 'Herkomst', 'Destination': 'Bestemming'}
+        df = df.rename(mapper=rename_mapper, axis=1)[rename_mapper.values()]
+
+        if not label:
+            sql = f"""
+                SELECT
+                arcs.Name
+                FROM arcs
+                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
+                GROUP BY "Days"
+                LIMIT 0, 1
+                """
+            label = self.sql(sql).iloc[0, 0]
+
+        # Plot
+        df.plot(kind='area', stacked=True, figsize=(16, 6))
+        plt.title(f'Locatie: {label}, jaar: {jaar}')
+        plt.grid()
+        plt.ylabel('Aantal schepen')
+        plt.ylim(bottom=0)
+
+        plt.savefig(figdir / f'TijdserieNode_{NodeID}_{label}.png', dpi=300, bbox_inches='tight')
+        df.to_csv(figdir / f'TijdserieNode_{NodeID}_{label}.csv')
+
+        plt.close()
+
+    def plot_piechart_node(self, groupby='NSTR', jaar=2011, NodeID=21639, label=None, directions=['Origin', 'Destination']):
+        """
+        Create timeserie of the number of ships departing and arriving at given node in given year.
+
+        jaar: labeled traffic scenario
+        nodeId: Node in BIVAS
+        label: give label for plot and file. Leave empty to autogenerate label from neighbouring arc
+        groupby: 'ship_types' or 'NSTR'
+        directions: can be either ['Origin', 'Destination'], ['Origin'] or ['Destination']
+        """
+        figdir = self.outputdir / 'figures_piechart_node'
+        if not figdir.exists():
+            figdir.mkdir()
+
+        logger.info(f'Plotting piechart voor node: {NodeID}, jaar: {jaar}')
+
+        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+
+
+        if groupby == 'ship_types':
+            groupby_field = 'ship_types.Label'
+            groupby_sort = 'CEMTTypeID, ship_types.ID'
+        elif groupby == 'NSTR':
+            groupby_field = 'nstr_mapping.GroupCode'
+            groupby_sort = 'nstr_mapping.GroupCode'
+        else:
+            logger.error(f'Groupby {groupby} not implemented')
+
+        dfs = {}
+        for d in directions:
+            sql = f"""
+                    SELECT
+                    {groupby_field} AS groupby,
+                    count(*) AS nTrips
+                    FROM trips
+
+                    LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                    LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
+                    LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                    LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
+                    LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
+                    LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
+                    WHERE TrafficScenarioID={trafficScenarioId}
+                        AND {d}TripEndPointNodeID={NodeID}
+                    GROUP BY {groupby_field}
+                    ORDER BY {groupby_sort}
+                    """
+            df = self.sql(sql)
+
+            # Format data
+            df = df.set_index('groupby')
+            dfs[d] = df['nTrips']
+
+        df = pd.concat(dfs, axis=1, sort=False).sum(axis=1)
+
+        if groupby == 'NSTR':
+            df.rename(self.NSTR_shortnames, inplace=True)
+
+        if not label:
+            sql = f"""
+                SELECT
+                arcs.Name
+                FROM arcs
+                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
+                GROUP BY "Days"
+                LIMIT 0, 1
+                """
+            label = self.sql(sql).iloc[0, 0]
+        only_large_labels = [k if v / df.max() > 0.05 else '' for k, v in df.iteritems()]
+
+        df.plot.pie(wedgeprops={'width': 1.0}, labels=only_large_labels, counterclock=False, startangle=90)
+        plt.ylabel('')
+        plt.title(f'Scheepvaart van en naar: {label}')
+
+        plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}.png', dpi=300, bbox_inches='tight')
+        df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}.csv')
+
+        plt.close()
+
 
     def plot_all(self):
         countingPoints = self.listCountingPoints()

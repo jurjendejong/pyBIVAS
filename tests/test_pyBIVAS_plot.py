@@ -45,6 +45,9 @@ class TestpyBIVAS_plot(TestCase):
     def test_plot_vlootopbouw(self):
         self.BIVAS.plot_Vlootopbouw(self.arcID, self.arcLabel)
 
+    def test_plot_tijdseries_vloot(self):
+        self.BIVAS.plot_tijdseries_vloot(self.arcID, self.arcLabel, time_start=50, time_end=110)
+
 
 class Test_IVS90_analyse(TestCase):
     database_file = Path(r'resources/Bivas_2018_v2.db')
@@ -77,3 +80,9 @@ class Test_IVS90_analyse(TestCase):
 
     def test_plot_YearlyChangesRWSklasse(self):
         self.BIVAS.plot_YearlyChangesRWSklasse()
+
+    def test_plot_timeseries_node(self):
+        self.BIVAS.plot_timeseries_node(jaar=2011, NodeID=21639)
+
+    def test_plot_piechart_node(self):
+        self.BIVAS.plot_piechart_node(groupby='NSTR', jaar=2011, NodeID=21639)
