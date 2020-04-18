@@ -648,6 +648,41 @@ class pyBIVAS:
         df = df.set_index('ArcID')
         return df
 
+    def sqlNodeStatistics(self, NodeID, trafficScenarioId, groupby_field, groupby_sort, directions):
+        """
+        directions: can be either ['Origin', 'Destination'], ['Origin'] or ['Destination']
+        """
+        dfs = {}
+        for d in directions:
+            sql = f"""
+                     SELECT
+                     {groupby_field} AS groupby,
+                     count(*) AS nTrips
+                     FROM trips
+
+                     LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                     LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
+                     LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                     LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
+                     LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
+                     LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
+                     WHERE TrafficScenarioID={trafficScenarioId}
+                         AND {d}TripEndPointNodeID={NodeID}
+                     GROUP BY {groupby_field}
+                     ORDER BY {groupby_sort}
+                     """
+            df = self.sql(sql)
+
+            # Format data
+            df = df.set_index('groupby')
+            dfs[d] = df['nTrips']
+
+        df = pd.concat(dfs, axis=1, sort=False).sum(axis=1)
+
+        if groupby_field == 'nstr_mapping.GroupCode':
+            df.rename(self.NSTR_shortnames, inplace=True)
+        return df
+
     """
     Network function
     """
@@ -716,6 +751,22 @@ class pyBIVAS:
         for name, nodes in pathnodes.items():
             _, pathedges[name] = self.findPathInNetworkx(nodes[0], nodes[1])
         return pathedges
+
+    def nodeLabel(self, NodeID):
+        """
+        Guess a label for a node, based on neighbouring arcs
+        """
+
+        sql = f"""
+                SELECT
+                arcs.Name
+                FROM arcs
+                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
+                GROUP BY "Days"
+                LIMIT 0, 1
+                """
+        label = self.sql(sql).iloc[0, 0]
+        return label
 
     """
     Compare two scenarios

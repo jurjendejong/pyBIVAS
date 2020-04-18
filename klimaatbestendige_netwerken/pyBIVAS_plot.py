@@ -862,47 +862,15 @@ class IVS90_analyse(pyBIVAS_plot):
             groupby_sort = 'nstr_mapping.GroupCode'
         else:
             logger.error(f'Groupby {groupby} not implemented')
+            return
 
-        dfs = {}
-        for d in directions:
-            sql = f"""
-                    SELECT
-                    {groupby_field} AS groupby,
-                    count(*) AS nTrips
-                    FROM trips
-
-                    LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
-                    LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
-                    LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
-                    LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
-                    LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
-                    LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
-                    WHERE TrafficScenarioID={trafficScenarioId}
-                        AND {d}TripEndPointNodeID={NodeID}
-                    GROUP BY {groupby_field}
-                    ORDER BY {groupby_sort}
-                    """
-            df = self.sql(sql)
-
-            # Format data
-            df = df.set_index('groupby')
-            dfs[d] = df['nTrips']
-
-        df = pd.concat(dfs, axis=1, sort=False).sum(axis=1)
-
-        if groupby == 'NSTR':
-            df.rename(self.NSTR_shortnames, inplace=True)
+        df = self.sqlNodeStatistics(NodeID=NodeID, trafficScenarioId=trafficScenarioId, groupby_field=groupby_field,
+                                    groupby_sort=groupby_sort, directions=directions)
 
         if not label:
-            sql = f"""
-                SELECT
-                arcs.Name
-                FROM arcs
-                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
-                GROUP BY "Days"
-                LIMIT 0, 1
-                """
-            label = self.sql(sql).iloc[0, 0]
+            label = self.nodeLabel(NodeID)
+
+        # Only label where the bin is larger than 5%
         only_large_labels = [k if v / df.max() > 0.05 else '' for k, v in df.iteritems()]
 
         df.plot.pie(wedgeprops={'width': 1.0}, labels=only_large_labels, counterclock=False, startangle=90)
