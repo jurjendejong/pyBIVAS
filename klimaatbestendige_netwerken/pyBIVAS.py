@@ -650,6 +650,12 @@ class pyBIVAS:
 
     def sqlNodeStatistics(self, NodeID, trafficScenarioId, groupby_field, groupby_sort, directions):
         """
+        Get statistics for trips in traffic scenario at a node
+
+        NodeID: ID of node of origin/destination
+        trafficScenarioId: trafficScenarioId
+        groupby_field: like 'nstr_mapping.GroupCode'
+        groupby_sort: can be identical to groupby_field, or a different field in the table
         directions: can be either ['Origin', 'Destination'], ['Origin'] or ['Destination']
         """
         dfs = {}
