@@ -147,7 +147,11 @@ class pyBIVAS:
         return cemt_class
 
     def sqlShipTypes(self):
-        sql = """SELECT ship_types.*, cemt_class.Description FROM ship_types LEFT JOIN cemt_class ON CEMTTypeID=cemt_class.ID ORDER BY CEMTTypeID, Id"""
+        sql = """
+        SELECT ship_types.*, cemt_class.Description
+        FROM ship_types
+        LEFT JOIN cemt_class ON CEMTTypeID=cemt_class.ID
+        ORDER BY CEMTTypeID, Id"""
         ship_types = self.sql(sql).set_index('ID')
         return ship_types
 
@@ -907,12 +911,21 @@ class pyBIVAS:
 
     # Functions without SQL
     def remove_small_ships(self, df, CEMTTypeIDmax=3):
+        """
+        In the given dataframe, for all ship_types with CEMT lower or equal to CEMTTypeIDmax,
+        change the ship type to 'M{cemt}' to reduce the number of classes
+
+        returns:
+            ordered_ship_types: the short list of ship types in sorted order
+            data_merge_small_ships: dataframe with field 'ship_type_label' updated
+        """
         ship_types = self.sqlShipTypes()
 
         small_ships = ship_types[ship_types['CEMTTypeID'] <= CEMTTypeIDmax]
         replace_label = {}
         # replace_description = {}
         for k, v in small_ships.iterrows():
+            # Skip rows which are already M{cent} type
             if not v['Label'] == f'M{v["CEMTTypeID"] - 1}':
                 replace_label[v['Label']] = f'M{v["CEMTTypeID"] - 1}'
 
