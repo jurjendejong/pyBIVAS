@@ -46,7 +46,7 @@ class pyBIVAS_plot_compare:
 
         tripsPerDay = {}
         for name, BIVAS in self.BIVAS_connection.items():
-            d = BIVAS.sqlArcDetails(arcID)
+            d = BIVAS.arc_tripdetails(arcID)
             tripsPerDay[name] = d['NumberOfTrips'].groupby(d['DateTime']).sum()
 
         tripsPerDay = pd.concat(tripsPerDay, axis=1)
@@ -116,8 +116,8 @@ class pyBIVAS_plot_compare:
         """
 
         for name, BIVAS in self.BIVAS_connection.items():
-            BIVAS.sqlArcs()
-            BIVAS.sqlNodes()
+            BIVAS.network_arcs()
+            BIVAS.network_nodes()
 
         BIVAS = self.BIVAS_connection[self.reference]
 
@@ -155,7 +155,7 @@ class pyBIVAS_plot_compare:
             # Get all big trips on most changing day
             routeStats = {}
             for name, BIVAS in self.BIVAS_connection.items():
-                routeStats[name] = BIVAS.sqlRouteStatistics()["Totale Vaarkosten (EUR)"]
+                routeStats[name] = BIVAS.routestatistics_timeseries()["Totale Vaarkosten (EUR)"]
             routeStats = pd.concat(routeStats, axis=1)
             routeStatsDiff = routeStats.diff(axis=1).iloc[:, -1].abs()
 
@@ -219,13 +219,13 @@ class pyBIVAS_plot_compare:
             river_background.plot(ax=ax, color='b')
 
             # Data from reference route
-            route = self.BIVAS_connection[ref].sqlRoute(routes)
-            routestats = self.BIVAS_connection[ref].sqlRouteStats(routes)
+            route = self.BIVAS_connection[ref].route_arcs(routes)
+            routestats = self.BIVAS_connection[ref].route_stats(routes)
             if len(route) == 0:
                 print('Skipping because route has not taken place')
                 continue
             startpoint, endpoint = getStartEnd(route)
-            referencestrips = self.BIVAS_connection[ref].sqlReferenceRoute(routes, route)
+            referencestrips = self.BIVAS_connection[ref].route_countingpoints(routes, route)
 
             # Plot reference route and data
             route.plot(color='r', ax=ax)
@@ -257,8 +257,8 @@ Number of Trips: {r[NumberOfTrips]:.1f}
 Load capacity: {r[LoadCapacity__t]:.1f} ton""".format(r=routestats.iloc[0])
             else:
                 # Data from case route
-                route2 = self.BIVAS_connection[case].sqlRoute(routes)
-                routestats2 = self.BIVAS_connection[case].sqlRouteStats(routes)
+                route2 = self.BIVAS_connection[case].route_arcs(routes)
+                routestats2 = self.BIVAS_connection[case].route_stats(routes)
 
                 if len(route2) == 0:
                     print('Skipping because route has not taken place')

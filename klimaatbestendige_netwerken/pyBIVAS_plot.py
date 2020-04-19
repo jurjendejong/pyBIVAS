@@ -87,7 +87,7 @@ class pyBIVAS_plot(pyBIVAS):
         if not figdir.exists():
             figdir.mkdir()
 
-        trips_on_arc = self.sqlArcDetails(arcID)
+        trips_on_arc = self.arc_tripdetails(arcID)
 
         # Create pivot table
         bins = np.arange(0, 5, 0.5)
@@ -120,13 +120,13 @@ class pyBIVAS_plot(pyBIVAS):
         elif stacking == 'ship_types_Label':
             figtype2 = 'Scheepvaartklasse'
         elif stacking == 'appearance_types_Description':
-            tp = tp.reindex(self.sqlAppearanceTypes()['Description'][::-1], axis=1)
+            tp = tp.reindex(self.appearancetypes()['Description'][::-1], axis=1)
             figtype2 = 'Vorm'
         elif stacking == 'lengte_bin':
             figtype2 = 'Lengte'
         elif stacking == 'cemt_class_Description':
             figtype2 = 'CEMT'
-            tp = tp.reindex(self.sqlCEMTclass()['Description'], axis=1).dropna(axis=1, how='all')
+            tp = tp.reindex(self.CEMTclass()['Description'], axis=1).dropna(axis=1, how='all')
         else:
             figtype2 = stacking
 
@@ -152,7 +152,7 @@ class pyBIVAS_plot(pyBIVAS):
         if not figdir.exists():
             figdir.mkdir()
 
-        df = self.sqlAdvancedRoutes(group_by='NSTR')
+        df = self.routestatistics_advanced(group_by='NSTR')
 
         for c in [c for c in df.columns if 'Totale' in c]:
             d = c.replace('Totale', 'Gemiddelde')
@@ -216,13 +216,13 @@ class pyBIVAS_plot(pyBIVAS):
         # SQL kosten en trips voor alle trips die langs een opgegeven Arc komen
         dfArcs = {}
         for ArcName, ArcID in self.Arcs.items():
-            df = self.sqlArcDetails(ArcID, group_by='NSTR')
+            df = self.arc_tripdetails(ArcID, group_by='NSTR')
             dfArcs[ArcName] = df[["Totale Vaarkosten (EUR)", "Totale Vracht (ton)", "Aantal Vaarbewegingen (-)"]]
 
         # Reset settings
         self.compute_route_statistics = compute_route_statistics_original
 
-        dfAllArcs = self.sqlAdvancedRoutes(group_by='NSTR')
+        dfAllArcs = self.routestatistics_advanced(group_by='NSTR')
         dfAllArcs = dfAllArcs[["Totale Vaarkosten (EUR)", "Totale Vracht (ton)", "Aantal Vaarbewegingen (-)"]]
 
         dfArcs['Totaal'] = dfAllArcs
@@ -290,7 +290,7 @@ class pyBIVAS_plot(pyBIVAS):
         df = self.sql(sql)
         df = df.replace({'NSTR': self.NSTR_shortnames})
 
-        trafficScenarios_table = self.sqlCountTripsPerTrafficScenario()
+        trafficScenarios_table = self.trafficscenario_numberoftrips()
         trafficScenarios_names = trafficScenarios_table['Description'].loc[trafficScenarios]
 
         ## Vaarbewegingen
@@ -330,7 +330,7 @@ class pyBIVAS_plot(pyBIVAS):
         if not figdir.exists():
             figdir.mkdir()
 
-        df = self.sqlArcDetails(arcID)
+        df = self.arc_tripdetails(arcID)
         df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
         if limit_to_1:
             df['Beladingsgraad'].loc[df['Beladingsgraad'] > 1] = 1
@@ -342,7 +342,7 @@ class pyBIVAS_plot(pyBIVAS):
         df_pivot = df.pivot_table(index='Beladingsgraad_bins', columns='appearance_types_Description',
                                   values='NumberOfTrips',
                                   aggfunc='sum')
-        df_pivot = df_pivot.reindex(self.sqlAppearanceTypes()['Description'][::-1], axis=1)
+        df_pivot = df_pivot.reindex(self.appearancetypes()['Description'][::-1], axis=1)
         df_pivot.columns.name = 'Vorm'
         df_pivot = df_pivot.fillna(0)
 
@@ -376,7 +376,7 @@ class pyBIVAS_plot(pyBIVAS):
         if not figdir.exists():
             figdir.mkdir()
 
-        df = self.sqlArcDetails(arcID)
+        df = self.arc_tripdetails(arcID)
 
         ordered_ship_types, data_merge_small_ships = self.remove_small_ships(df)
         data = data_merge_small_ships.groupby(['DateTime', 'ship_types_Label']).count()['Depth__m'].unstack()[
@@ -428,11 +428,11 @@ class pyBIVAS_plot(pyBIVAS):
         if not figdir.exists():
             figdir.mkdir()
 
-        df = self.sqlArcDetails(arcID)
-        ship_types = self.sqlShipTypes()
+        df = self.arc_tripdetails(arcID)
+        ship_types = self.shiptypes()
 
         ordered_ship_types, data_merge_small_ships = self.remove_small_ships(df)
-        appearanceTypesOrder = self.sqlAppearanceTypes()['Description'][::-1]
+        appearanceTypesOrder = self.appearancetypes()['Description'][::-1]
         data = data_merge_small_ships.groupby(['ship_types_Label', 'appearance_types_Description']
                                               ).count()['Depth__m'].unstack().loc[
             ordered_ship_types, appearanceTypesOrder].fillna(0)  # TODO: Change .loc[] to .reindex()
@@ -492,8 +492,8 @@ class IVS90_analyse(pyBIVAS_plot):
 
         self.traffic_scenarios = traffic_scenarios
 
-        self.cemt_order = self.sqlCEMTclass()['Description']
-        self.ship_types_order = self.sqlShipTypes()['Description']
+        self.cemt_order = self.CEMTclass()['Description']
+        self.ship_types_order = self.shiptypes()['Description']
 
     # Jaarlijkse variatie
     def plot_CountingPointsForYear(self, telpunt='Prins Bernhardsluis', jaar=2018):
@@ -639,7 +639,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
     def export_shapefile_nodesstats(self, jaar):
         trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
-        nodes = self.sqlNodes()
+        nodes = self.network_nodes()
         stats = self.node_statistics_all(trafficScenarioId)
 
         nodes_stats = nodes.join(stats)
@@ -745,7 +745,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
     def plot_all(self):
         countingPoints = self.countingpoint_list()
-        nodes = self.sqlNodes()['ID']
+        nodes = self.network_nodes()['ID']
         for c in countingPoints['Name']:
             for y in self.traffic_scenarios.index:
                 self.plot_CountingPointsForYear(c, y)
