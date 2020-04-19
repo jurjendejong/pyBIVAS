@@ -8,7 +8,7 @@ class TestpyBIVAS_plot(TestCase):
     skipSlowRuns = True
     # skipSlowRuns=("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true")
 
-    database_file = Path(r'resources/Bivas_2018_v2.db')
+    database_file = Path(r'resources/Bivas_2018_v3.db')
 
     def setUp(self):
         # Test if database exists
@@ -78,11 +78,12 @@ class Test_IVS90_analyse(TestCase):
     def test_plot_YearlyChangesCEMT(self):
         self.BIVAS.plot_YearlyChangesCEMT()
 
-    def test_plot_YearlyChangesRWSklasse(self):
-        self.BIVAS.plot_YearlyChangesRWSklasse()
-
     def test_plot_timeseries_node(self):
         self.BIVAS.plot_timeseries_node(jaar=2011, NodeID=21639)
 
     def test_plot_piechart_node(self):
         self.BIVAS.plot_piechart_node(groupby='NSTR', jaar=2011, NodeID=21639)
+        self.BIVAS.plot_piechart_node(groupby='ship_types', jaar=2011, NodeID=21639)
+
+    def test_export_shapefile_nodesstats(self):
+        self.BIVAS.export_shapefile_nodesstats(jaar=2011)

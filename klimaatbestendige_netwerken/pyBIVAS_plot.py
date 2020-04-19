@@ -509,31 +509,9 @@ class IVS90_analyse(pyBIVAS_plot):
         countingPointName = telpunt
 
         # Query data
-        sql = """
-        SELECT
-        DATE(trips.DateTime) AS "Days",
-        directions.Label AS Vaarrichting,
-        count(*) AS nTrips
-        FROM reference_trip_set
-        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-        LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
-        LEFT JOIN directions on counting_points.DirectionID == directions.ID
-        WHERE ReferenceSetID = {}
-        AND counting_points.Name = "{}"
-        AND trips.TrafficScenarioID = {}
-        GROUP BY "Days", counting_points.DirectionID
-        """.format(referenceSetId, countingPointName, trafficScenarioId)
-        df = self.sql(sql)
+        df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId)
         if not len(df):
             return 'No data'
-
-        # Format data
-        df['Days'] = pd.to_datetime(df['Days'])
-        df = df.set_index('Days')
-        df = df.pivot(columns='Vaarrichting')['nTrips']
-        fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
-        df = df.loc[fullyear]
-        df[df.isnull()] = 0
 
         # Plot data
         df.plot(kind='area', stacked=True, figsize=(16, 6), )
@@ -546,8 +524,10 @@ class IVS90_analyse(pyBIVAS_plot):
 
         plt.close()
 
-    # Opbouw vaarbewegingen
     def plot_CEMTclassesForYear(self, telpunt='Prins Bernhardsluis', jaar=2018):
+        """
+        Opbouw vaarbewegingen voor telpunt en jaar
+        """
         figdir = self.outputdir / 'figures_CEMTclassesForYear'
         if not figdir.exists():
             figdir.mkdir()
@@ -560,28 +540,9 @@ class IVS90_analyse(pyBIVAS_plot):
         countingPointName = telpunt
 
         # Query data
-        sql = """
-        SELECT
-        count(*) AS nTrips,
-        cemt_class.Description AS CEMT_klasse
-        FROM reference_trip_set
-        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-        LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
-        LEFT JOIN ship_types ON trips.ShipTypeID == ship_types.ID
-        LEFT JOIN cemt_class ON ship_types.CEMTTypeID == cemt_class.ID
-        WHERE ReferenceSetID = {}
-        AND counting_points.Name = "{}"
-        AND trips.TrafficScenarioID = {}
-        GROUP BY CEMT_klasse
-        ORDER BY cemt_class.ID
-        """.format(referenceSetId, countingPointName, trafficScenarioId)
-        df = self.sql(sql)
+        df = self.countingpoint_CEMT_klasse(referenceSetId, countingPointName, trafficScenarioId)
         if not len(df):
             return 'No data'
-
-        # Format data
-        df = df.set_index('CEMT_klasse')
-        df = df['nTrips']
 
         # Plot data
         df.plot.pie(stacked=True, figsize=(6, 6), cmap='coolwarm', wedgeprops={'edgecolor': 'w'})
@@ -590,7 +551,7 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('Verdeling CEMT klasse (naar aantal passages)')
 
         plt.savefig(figdir / 'CEMT_{}_{}.png'.format(telpunt, jaar), dpi=300)
-        df.to_csv(figdir / 'CEMT_{}_{}.csv'.format(telpunt, jaar))
+        df.to_csv(figdir / 'CEMT_{}_{}.csv'.format(telpunt, jaar), header=False)
 
         plt.close()
 
@@ -609,31 +570,12 @@ class IVS90_analyse(pyBIVAS_plot):
             countingPointName = telpunt
 
             # Query data
-            sql = """
-            SELECT
-            DATE(trips.DateTime) AS "Days",
-            count(*) AS nTrips
-            FROM reference_trip_set
-            LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-            LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
-            WHERE ReferenceSetID = {}
-            AND counting_points.Name = "{}"
-            AND trips.TrafficScenarioID = {}
-            GROUP BY "Days"
-            """.format(referenceSetId, countingPointName, trafficScenarioId)
-            df = self.sql(sql)
+            df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, per_direction=False)
+
             if not len(df):
                 continue
 
             # Format data
-            df['Days'] = pd.to_datetime(df['Days'])
-            df = df.set_index('Days')
-            df = df['nTrips']
-
-            fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
-            df = df.loc[fullyear]
-            df[df.isnull()] = 0
-
             df = df.resample('M').sum()
             df.index = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
 
@@ -671,28 +613,11 @@ class IVS90_analyse(pyBIVAS_plot):
             countingPointName = telpunt
 
             # Query data
-            sql = """
-            SELECT
-            cemt_class.Description AS CEMT_klasse,
-            count(*) AS nTrips
-            FROM reference_trip_set
-            LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-            LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
-            LEFT JOIN ship_types ON trips.ShipTypeID == ship_types.ID
-            LEFT JOIN cemt_class ON ship_types.CEMTTypeID == cemt_class.ID
-            WHERE ReferenceSetID = {}
-            AND counting_points.Name = "{}"
-            AND trips.TrafficScenarioID = {}
-            GROUP BY CEMT_klasse
-            ORDER BY cemt_class.ID
-            """.format(referenceSetId, countingPointName, trafficScenarioId)
-            df = self.sql(sql)
+            df = self.countingpoint_CEMT_klasse(referenceSetId, countingPointName, trafficScenarioId)
             if not len(df):
                 continue
 
-            df.set_index('CEMT_klasse', inplace=True)
-
-            dfs[jaar] = df['nTrips']
+            dfs[jaar] = df
 
         if not len(dfs):
             return 'No data'
@@ -712,61 +637,19 @@ class IVS90_analyse(pyBIVAS_plot):
 
         plt.close()
 
-    def plot_YearlyChangesRWSklasse(self, telpunt='Maasbracht sluis'):
-        figdir = self.outputdir / 'figures_YearlyChangesRWSklasse'
-        if not figdir.exists():
-            figdir.mkdir()
+    def export_shapefile_nodesstats(self, jaar):
+        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+        nodes = self.sqlNodes()
+        stats = self.node_statistics_all(trafficScenarioId)
 
-        logger.info(f'Plotting YearlyChangesRWSklasse voor telpunt: {telpunt}')
+        nodes_stats = nodes.join(stats)
 
-        dfs = {}
-        for jaar in self.traffic_scenarios.index:
-            # Set variables
-            referenceSetId = self.traffic_scenarios.loc[jaar, 'reference_trips_sets_id']
-            trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
-            countingPointName = telpunt
+        outputfile_csv = self.outputdir / f'node_statistics_{jaar}.csv'
+        outputfile_shp = self.outputdir / f'node_statistics_{jaar}.shp'
+        nodes_stats.to_csv(outputfile_csv)
+        nodes_stats.to_file(outputfile_shp)
 
-            # Query data
-            sql = """
-            SELECT
-            cemt_class.Description AS CEMT_klasse,
-            ship_types.Label AS RWS_klasse,
-            count(*) AS nTrips
-            FROM reference_trip_set
-            LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-            LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
-            LEFT JOIN ship_types ON trips.ShipTypeID == ship_types.ID
-            LEFT JOIN cemt_class ON ship_types.CEMTTypeID == cemt_class.ID
-            WHERE ReferenceSetID = {}
-            AND counting_points.Name = "{}"
-            AND trips.TrafficScenarioID = {}
-            GROUP BY RWS_klasse
-            ORDER BY RWS_klasse
-            """.format(referenceSetId, countingPointName, trafficScenarioId)
-            df = self.sql(sql)
-            if not len(df):
-                continue
 
-            df.set_index('RWS_klasse', inplace=True)
-            dfs[jaar] = df['nTrips']
-
-        if not len(dfs):
-            return 'No data'
-
-        dfs = pd.concat(dfs, axis=1, sort=False)
-        dfs = dfs.reindex(index=[o for o in self.ship_types_order])
-
-        # Plot data
-        dfs.T.plot.bar(figsize=(6, 6), width=0.75, stacked=True, zorder=3)
-        plt.title('{}'.format(telpunt))
-        plt.grid()
-        plt.ylabel('Aantal passages')
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
-        plt.savefig(figdir / 'HistorischVerloopYearRWSklasse_{}.png'.format(telpunt), dpi=300, bbox_inches='tight')
-        dfs.to_csv(figdir / 'HistorischVerloopYearRWSklasse_{}.csv'.format(telpunt))
-
-        plt.close()
 
     def plot_timeseries_node(self, jaar=2011, NodeID=21639, label=None):
         """
@@ -785,43 +668,17 @@ class IVS90_analyse(pyBIVAS_plot):
 
         trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
 
-        dfs = {}
-        for d in ['Origin', 'Destination']:
-            sql = f"""
-                    SELECT
-                    DATE(trips.DateTime) AS "Days",
-                    count(*) AS nTrips
-                    FROM trips
-                    WHERE TrafficScenarioID={trafficScenarioId}
-                        AND {d}TripEndPointNodeID={NodeID}
-                    GROUP BY "Days"
-                    """
-            df = self.sql(sql)
+        # Query data
+        df = self.node_timeseries(NodeID, trafficScenarioId)
+        if len(df)==0:
+            return 'No data'
 
-            # Format data
-            df['Days'] = pd.to_datetime(df['Days'])
-            df = df.set_index('Days')
-            df = df['nTrips']
-
-            fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
-
-            dfs[d] = df.reindex(fullyear, fill_value=0)
-
-        df = pd.concat(dfs, axis=1)
-
+        # Format
         rename_mapper = {'Origin': 'Herkomst', 'Destination': 'Bestemming'}
         df = df.rename(mapper=rename_mapper, axis=1)[rename_mapper.values()]
 
         if not label:
-            sql = f"""
-                SELECT
-                arcs.Name
-                FROM arcs
-                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
-                GROUP BY "Days"
-                LIMIT 0, 1
-                """
-            label = self.sql(sql).iloc[0, 0]
+            label = self.node_label(NodeID)
 
         # Plot
         df.plot(kind='area', stacked=True, figsize=(16, 6))
@@ -853,7 +710,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
 
-
+        # Query
         if groupby == 'ship_types':
             groupby_field = 'ship_types.Label'
             groupby_sort = 'CEMTTypeID, ship_types.ID'
@@ -864,12 +721,15 @@ class IVS90_analyse(pyBIVAS_plot):
             logger.error(f'Groupby {groupby} not implemented')
             return
 
-        df = self.sqlNodeStatistics(NodeID=NodeID, trafficScenarioId=trafficScenarioId, groupby_field=groupby_field,
-                                    groupby_sort=groupby_sort, directions=directions)
+        df = self.node_statistics(NodeID=NodeID, trafficScenarioId=trafficScenarioId, groupby_field=groupby_field,
+                                  groupby_sort=groupby_sort, directions=directions)
+        if len(df)==0:
+            return 'No data'
 
         if not label:
-            label = self.nodeLabel(NodeID)
+            label = self.node_label(NodeID)
 
+        # Plot
         # Only label where the bin is larger than 5%
         only_large_labels = [k if v / df.max() > 0.05 else '' for k, v in df.iteritems()]
 
@@ -877,14 +737,15 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('')
         plt.title(f'Scheepvaart van en naar: {label}')
 
-        plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}.png', dpi=300, bbox_inches='tight')
-        df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}.csv')
+        plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
+        df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.csv', header=False)
 
         plt.close()
 
 
     def plot_all(self):
-        countingPoints = self.listCountingPoints()
+        countingPoints = self.countingpoint_list()
+        nodes = self.sqlNodes()['ID']
         for c in countingPoints['Name']:
             for y in self.traffic_scenarios.index:
                 self.plot_CountingPointsForYear(c, y)
@@ -899,5 +760,12 @@ class IVS90_analyse(pyBIVAS_plot):
         for c in countingPoints['Name']:
             self.plot_YearlyChangesCEMT(c)
 
-        for c in countingPoints['Name']:
-            self.plot_YearlyChangesRWSklasse(c)
+        for n in nodes:
+            for y in self.traffic_scenarios.index:
+                self.plot_timeseries_node(jaar=y, NodeID=n)
+
+        for n in nodes:
+            for y in self.traffic_scenarios.index:
+                self.plot_piechart_node(groupby='NSTR', jaar=y, NodeID=n)
+                self.plot_piechart_node(groupby='ship_types', jaar=y, NodeID=n)
+

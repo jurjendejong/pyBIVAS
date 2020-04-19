@@ -59,6 +59,19 @@ class pyBIVAS:
         SUM((trips.TotalWeight__t * route_statistics.Distance__km) * trips.NumberOfTrips) AS "Totale TonKM (TONKM)"
     """
 
+    directions_dutch = {
+        'Downstream': 'Benedenstrooms',
+        'South-East': 'Zuid-Oost',
+        'South-West': 'Zuid-West',
+        'West': 'West',
+        'South': 'Zuid',
+        'North': 'Noord',
+        'East': 'Oost',
+        'North-East': 'Noord-Oost',
+        'North-West': 'Noord-West',
+        'Upstream': 'Bovenstrooms'
+    }
+
     def __init__(self, databasefile=None):
         """
         Initialise class
@@ -648,7 +661,7 @@ class pyBIVAS:
         df = df.set_index('ArcID')
         return df
 
-    def sqlNodeStatistics(self, NodeID, trafficScenarioId, groupby_field, groupby_sort, directions):
+    def node_statistics(self, NodeID, trafficScenarioId, groupby_field, groupby_sort, directions):
         """
         Get statistics for trips in traffic scenario at a node
 
@@ -689,6 +702,65 @@ class pyBIVAS:
             df.rename(self.NSTR_shortnames, inplace=True)
         return df
 
+    def node_statistics_all(self, trafficScenarioId):
+        directions = ['Origin', 'Destination']
+        dfs = {}
+        for d in directions:
+            sql = f"""
+                    SELECT {d}TripEndPointNodeID AS NodeID,
+                    count(*) AS nTrips
+                    FROM trips
+                    WHERE TrafficScenarioID={trafficScenarioId}
+                    GROUP BY {d}TripEndPointNodeID
+                    """
+            df = self.sql(sql)
+            dfs[d] = df.set_index('NodeID')['nTrips']
+        df = pd.concat(dfs, axis=1)
+        return df
+
+
+    def node_timeseries(self, NodeID, trafficScenarioId):
+        dfs = {}
+        for d in ['Origin', 'Destination']:
+            sql = f"""
+                    SELECT
+                    DATE(trips.DateTime) AS "Days",
+                    count(*) AS nTrips
+                    FROM trips
+                    WHERE TrafficScenarioID={trafficScenarioId}
+                        AND {d}TripEndPointNodeID={NodeID}
+                    GROUP BY "Days"
+                    """
+            df = self.sql(sql)
+
+            # Format data
+            df['Days'] = pd.to_datetime(df['Days'])
+            df = df.set_index('Days')
+            df = df['nTrips']
+
+            fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
+            dfs[d] = df.reindex(fullyear, fill_value=0)
+
+        df = pd.concat(dfs, axis=1)
+        return df
+
+    def node_label(self, NodeID):
+        """
+        Guess a label for a node, based on neighbouring arcs
+        """
+
+        sql = f"""
+                SELECT
+                arcs.Name
+                FROM arcs
+                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
+                GROUP BY "Days"
+                LIMIT 0, 1
+                """
+        label = self.sql(sql).iloc[0, 0]
+        return label
+
+
     """
     Network function
     """
@@ -726,53 +798,6 @@ class pyBIVAS:
         self.NetworkX = G
         return self.NetworkX
 
-    def findPathInNetworkx(self, nodeidstart, nodeidend):
-        """Find the path between two nodes
-        Returns list of nodes and edges
-        """
-        if not hasattr(self, 'NetworkX'):
-            self.sqlNetworkToNetworkx()
-
-        pathnodes = nx.dijkstra_path(
-            self.NetworkX, nodeidstart, nodeidend, weight='Length__m')
-        pathedges = []
-        for i in range(len(pathnodes) - 1):
-            pathedges.append(
-                self.NetworkX[pathnodes[i]][pathnodes[i + 1]]['ID'])
-        return pathnodes, pathedges
-
-    def findEdgesForNodes(self, pathnodes):
-        """
-        for each set of nodes, find the path between the nodes
-
-        pathnodes={
-        'Waal_Upstream':(6855,6799),
-        'Waal_Downstream':(6799,7073)}
-        """
-
-        if not hasattr(self, 'NetworkX'):
-            self.sqlNetworkToNetworkx()
-
-        pathedges = {}
-        for name, nodes in pathnodes.items():
-            _, pathedges[name] = self.findPathInNetworkx(nodes[0], nodes[1])
-        return pathedges
-
-    def nodeLabel(self, NodeID):
-        """
-        Guess a label for a node, based on neighbouring arcs
-        """
-
-        sql = f"""
-                SELECT
-                arcs.Name
-                FROM arcs
-                WHERE (FromNodeID={NodeID} OR ToNodeID={NodeID})
-                GROUP BY "Days"
-                LIMIT 0, 1
-                """
-        label = self.sql(sql).iloc[0, 0]
-        return label
 
     """
     Compare two scenarios
@@ -945,7 +970,10 @@ class pyBIVAS:
         referencestrips['geometry'] = referencestrips['geometry'].representative_point()
         return referencestrips
 
-    def listCountingPoints(self):
+    def countingpoint_list(self):
+        """
+        Returns list of all counting points including coordinates
+        """
         sql = """
         SELECT
         counting_points.Name AS Name,
@@ -960,6 +988,91 @@ class pyBIVAS:
         arcs = arcs[['Name', 'XM', 'YM']]
         countingPoints = countingPoints.join(arcs, how='left', on='ArcID', rsuffix='_arcs')
         return countingPoints
+
+    def countingpoint_timeseries(self, referenceSetId, countingPointName, trafficScenarioId, per_direction=True):
+        """
+        Create timeserie of all trips passing a countingpoint in the referenceset.
+        Possible to differentiate per direction, or have it combined
+        """
+        if per_direction:
+            groupby = '"Days", counting_points.DirectionID'
+        else:
+            groupby = '"Days"'
+
+        sql = f"""
+        SELECT
+        DATE(trips.DateTime) AS "Days",
+        directions.Label AS Vaarrichting,
+        count(*) AS nTrips
+        FROM reference_trip_set
+        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
+        LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
+        LEFT JOIN directions on counting_points.DirectionID == directions.ID
+        WHERE ReferenceSetID = {referenceSetId}
+        AND counting_points.Name = "{countingPointName}"
+        AND trips.TrafficScenarioID = {trafficScenarioId}
+        GROUP BY {groupby}
+        """
+        df = self.sql(sql)
+
+        df['Days'] = pd.to_datetime(df['Days'])
+        df = df.set_index('Days')
+        if per_direction:
+            df = df.pivot(columns='Vaarrichting')
+            df.rename(mapper=self.directions_dutch, inplace=True)
+        df = df['nTrips']
+        fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
+        df = df.reindex(fullyear, fill_value=0)
+        return df
+
+    def countingpoint_CEMT_klasse(self, referenceSetId, countingPointName, trafficScenarioId):
+        """
+        Get statistics on CEMT class at a counting point
+        """
+        sql = """
+        SELECT
+        count(*) AS nTrips,
+        cemt_class.Description AS CEMT_klasse
+        FROM reference_trip_set
+        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
+        LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
+        LEFT JOIN ship_types ON trips.ShipTypeID == ship_types.ID
+        LEFT JOIN cemt_class ON ship_types.CEMTTypeID == cemt_class.ID
+        WHERE ReferenceSetID = {}
+        AND counting_points.Name = "{}"
+        AND trips.TrafficScenarioID = {}
+        GROUP BY CEMT_klasse
+        ORDER BY cemt_class.ID
+        """.format(referenceSetId, countingPointName, trafficScenarioId)
+        df = self.sql(sql)
+        df = df.set_index('CEMT_klasse')
+        df = df['nTrips']
+        return df
+
+    def reference_bivas_comparison(self, countingPointName):
+        """
+        Get statistics for countingpoint
+        """
+        sql = f"""
+        SELECT
+        cemt_class.Description,
+        SUM(ReferenceTripCount) AS ReferenceTripCount,
+        SUM(BivasRouteCount) AS BivasRouteCount,
+        SUM(ReferenceBivasRouteCount) AS ReferenceBivasRouteCount,
+        SUM(ReferenceNotBivasRouteCount) AS ReferenceNotBivasRouteCount,
+        SUM(NotReferenceBivasRouteCount) AS NotReferenceBivasRouteCount,
+        SUM(ReferenceInfeasibleCount) AS ReferenceInfeasibleCount
+        FROM reference_comparison_51 AS reference_comparison
+        LEFT JOIN counting_points ON reference_comparison.CountingPointID == counting_points.ID
+        LEFT JOIN ship_types ON reference_comparison.ShipTypeID = ship_types.ID
+        LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+        WHERE counting_points.Name = {countingPointName}
+        GROUP BY cemt_class.Id
+        ORDER BY cemt_class.Id
+        """
+        df = self.sql(sql)
+        return df
+
 
     def sql(self, sql):
         """ Execute sql on loaded database"""
@@ -993,5 +1106,43 @@ class pyBIVAS:
         return ordered_ship_types, data_merge_small_ships
 
     def not_empty(self, df):
+        """
+        Returns all ships which are not empty based on the columns AppearanceTypeID and TotalWeight__t
+        # TODO: could have used loadTypeID instead...
+        """
         df_notempty = df[(df['AppearanceTypeID'] > 0) & (df['TotalWeight__t'] > 0)]
         return df_notempty
+
+
+
+    def findPathInNetworkx(self, nodeidstart, nodeidend):
+        """Find the path between two nodes
+        Returns list of nodes and edges
+        """
+        if not hasattr(self, 'NetworkX'):
+            self.sqlNetworkToNetworkx()
+
+        pathnodes = nx.dijkstra_path(
+            self.NetworkX, nodeidstart, nodeidend, weight='Length__m')
+        pathedges = []
+        for i in range(len(pathnodes) - 1):
+            pathedges.append(
+                self.NetworkX[pathnodes[i]][pathnodes[i + 1]]['ID'])
+        return pathnodes, pathedges
+
+    def findEdgesForNodes(self, pathnodes):
+        """
+        for each set of nodes, find the path between the nodes
+
+        pathnodes={
+        'Waal_Upstream':(6855,6799),
+        'Waal_Downstream':(6799,7073)}
+        """
+
+        if not hasattr(self, 'NetworkX'):
+            self.sqlNetworkToNetworkx()
+
+        pathedges = {}
+        for name, nodes in pathnodes.items():
+            _, pathedges[name] = self.findPathInNetworkx(nodes[0], nodes[1])
+        return pathedges
