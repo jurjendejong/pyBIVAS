@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block head %}
+{% endblock %}
+
+{% block body %}
+<H1>Template</H1>
+
+<select name="countingpoints" method="GET" action="/">
+    {% for countingpoint in countingpoints %}
+    <option value= "{{countingpoint}}" SELECTED>{{countingpoint}}</option>"
+    {% endfor %}
+</select>
+
+{% endblock %}
