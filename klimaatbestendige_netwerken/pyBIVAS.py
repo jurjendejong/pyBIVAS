@@ -103,7 +103,7 @@ class pyBIVAS:
         """
         logger.info('Loading database: {}'.format(databasefile))
         self.databasefile = databasefile
-        self.connection = sqlite3.connect(self.databasefile)
+        self.connection = sqlite3.connect(self.databasefile, check_same_thread=False)
         return self.connection
 
     def set_scenario(self, scenario=None):
@@ -912,11 +912,17 @@ class pyBIVAS:
         countingPoints = countingPoints.join(arcs, how='left', on='ArcID', rsuffix='_arcs')
         return countingPoints
 
-    def countingpoint_timeseries(self, referenceSetId, countingPointName, trafficScenarioId, per_direction=True):
+    def countingpoint_timeseries(self, countingPointName, trafficScenarioId=None, referenceSetId=None, per_direction=True):
         """
         Create timeserie of all trips passing a countingpoint in the referenceset.
         Possible to differentiate per direction, or have it combined
         """
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
+
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+
         if per_direction:
             groupby = '"Days", counting_points.DirectionID'
         else:
@@ -948,10 +954,18 @@ class pyBIVAS:
         df = df.reindex(fullyear, fill_value=0)
         return df
 
-    def countingpoint_CEMT_klasse(self, referenceSetId, countingPointName, trafficScenarioId):
+    def countingpoint_CEMT_klasse(self, countingPointName, referenceSetId=None, trafficScenarioId=None):
         """
         Get statistics on CEMT class at a counting point
         """
+
+
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
+
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+
         sql = """
         SELECT
         count(*) AS nTrips,
