@@ -71,10 +71,10 @@ class pyFIS:
     def get_object(self, geotype, objectid):
         """
         Load all data of one object
-        
+
         >> get_object('bridge', 2123)
         return: objectdetails
-        
+
         """
         objectid = str(objectid)
         return self._parse_request([self.geogeneration, geotype, objectid])
@@ -82,18 +82,18 @@ class pyFIS:
     def get_object_subobjects(self, geotype, objectid, geotype2):
         """
         Load all data of one object
-        
+
         >> get_object_subobjects('bridge', 1217, 'opening')
         return: [openingid#1, openingid#2, ...]
-        
+
         """
         objectid = str(objectid)
         return self._parse_request([self.geogeneration, geotype, objectid, geotype2])
 
     def _parse_request(self, components):
         """
-        Internal command to create and send requets of different kind. It combines 
-        components with the baseurl and reads the response. If the data contains 
+        Internal command to create and send requets of different kind. It combines
+        components with the baseurl and reads the response. If the data contains
         'Result' it will be processed as a multi-page datasource and converted to DataFrame.
         """
 
@@ -160,7 +160,7 @@ class pyFIS:
         """
         Find all objects within given polygon
         Polygon may be of type tuple or shapely Polygon
-        
+
         pol = [(5.774, 51.898),
                (5.742, 51.813),
                (6.020, 51.779),
@@ -180,10 +180,10 @@ class pyFIS:
         """
         Find object closest to given point
         Point may be of type tuple or shapely Point
-        
+
         point = (5.774, 51.898)
         find_closest_object('bridge', point)
-        
+
         """
         if not isinstance(point, Point):
             point = Point(point)
@@ -217,15 +217,17 @@ class pyFIS:
         df_merge = df_l.merge(df_r, left_on=left_on, right_on=right_on, suffixes=('', f'_{right_geotype}'))
         return df_merge
 
-    def export(self, filepath, filetype=None, force=True):
+    def export(self, filepath, filetype=None, force=True, geotypes=None):
         """
-        
+
         Export entire server to excel or sqlite database
         Used for backuping.
 
-        filetype = [None, xlsx]
-        if None, the filepath should end with filetype extension
-        
+        filetype = [None, xlsx, xls, csv]
+                if None, the filepath should end with filetype extension
+        force = boleaan. Overwrite file if already exists
+        geotypes = only export specific geotypes
+
         """
         # TODO: implement sqlite
         filepath = Path(filepath)
@@ -238,20 +240,27 @@ class pyFIS:
             else:
                 filepath.unlink()
 
-        self.list_all_objects()
+        if geotypes is None:
+            geotypes = self.list_geotypes()
 
         if filetype in ['xlsx', 'xls']:
             logger.debug('Writing to excel')
             # Write to excel
             writer = pd.ExcelWriter(filepath, engine='xlsxwriter')
 
-            for geotype in self.list_geotypes():
+            for geotype in geotypes:
                 logger.debug(f'Writing: {geotype}')
                 df = self.list_objects(geotype)
                 sheet_name = geotype[:31]
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
             logger.debug(f'Saving excel')
             writer.save()
+        elif filetype == 'csv':
+            for geotype in geotypes:
+                logger.debug(f'Writing: {geotype}')
+                df = self.list_objects(geotype)
+                filepath_geotype = (filepath.parent / f'{filepath.stem}_{geotype}.csv')
+                df.to_csv(filepath_geotype, index=False)
         else:
             logger.error(f'Unrecognised filetype: {filetype}')
             NotImplementedError('Unrecognised filetype')
