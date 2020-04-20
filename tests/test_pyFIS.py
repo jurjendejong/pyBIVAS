@@ -16,13 +16,17 @@ logging.basicConfig(level=logging.DEBUG)
 class test_pyFIS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
 
-    skipSlowRuns = True
+    skipSlowRuns = False
 
     export_dir = Path('export_pyFIS')
 
+
     def setUp(self):
-        """Set up test fixtures, if any."""
+        """Set up test fixtures"""
         self.FIS = pyFIS.pyFIS()
+
+        if not self.export_dir.exists():
+            self.export_dir.mkdir()
 
     def test_print_geogeneration(self):
         print(f'Geogeneration: {self.FIS.geogeneration}, Publication Date: {self.FIS.publication_date}')
