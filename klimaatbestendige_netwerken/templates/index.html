@@ -6,10 +6,20 @@
 {% block body %}
 <H1>Template</H1>
 
-<select name="countingpoints" method="GET" action="/">
-    {% for countingpoint in countingpoints %}
-    <option value= "{{countingpoint}}" SELECTED>{{countingpoint}}</option>"
-    {% endfor %}
-</select>
+<form method="POST" action="/">
+    <select name="countingpoint", id="countingpoint">
+        {% for countingpoint in countingpoints %}
+        <option value= "{{countingpoint}}">{{countingpoint}}</option>"
+        {% endfor %}
+    </select>
+</form>
+<div class="chart" id="graph">
+    <script>
+        var graph = {{plot | safe}};
+        Plotly.plot('graph',graph,{});
+    </script>
+</div>
+
+<script src="{{ url_for('static', filename='js/plots.js') }}"></script>
 
 {% endblock %}
