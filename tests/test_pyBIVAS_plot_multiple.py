@@ -7,8 +7,8 @@ from pathlib import Path
 class TestpyBIVAS_plot(TestCase):
     skipSlowRuns = True
 
-    database_file_1 = Path(r'resources/Bivas_2018_v2.db')
-    database_file_2 = Path(r'resources/Bivas_2018_v2.db')
+    database_file_1 = Path(r'resources/Bivas_2018_v3.db')
+    database_file_2 = Path(r'resources/Bivas_2018_v3.db')
 
     arcName = 'BovenRijn'
     arcID = pyBIVAS_plot.Arcs[arcName]
