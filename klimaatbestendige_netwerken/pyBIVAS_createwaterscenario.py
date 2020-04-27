@@ -54,9 +54,9 @@ class CreateWaterScenario:
         # Read BIVAS-network to networkx
         self.BIVAS = pyBIVAS(BIVAS_database)
         self.BIVAS.set_scenario()
-        self.BIVAS_networkx = self.BIVAS.sqlNetworkToNetworkx()
-        self.BIVAS_arcs = self.BIVAS.sqlArcs()
-        self.BIVAS_nodes = self.BIVAS.sqlNodes()
+        self.BIVAS_networkx = self.BIVAS.networkx_generate()
+        self.BIVAS_arcs = self.BIVAS.network_arcs()
+        self.BIVAS_nodes = self.BIVAS.network_nodes()
 
     def create_mapping(self, bivas_reaches, sobek_reaches):
         logging.info('Creating koppeling')

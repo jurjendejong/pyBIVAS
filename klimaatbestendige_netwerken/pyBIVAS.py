@@ -1064,7 +1064,8 @@ class pyBIVAS:
         data_merge_small_ships = data_merge_small_ships.replace({'ship_types_Label': replace_label})
         return ordered_ship_types, data_merge_small_ships
 
-    def not_empty(self, df):
+    @staticmethod
+    def not_empty(df):
         """
         Returns all ships which are not empty based on the columns AppearanceTypeID and TotalWeight__t
         # TODO: could have used loadTypeID instead...
