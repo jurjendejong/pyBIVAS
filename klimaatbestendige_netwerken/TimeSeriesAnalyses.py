@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 
-class ExceedanceLevels:
+class TimeSeriesAnalyses:
     return_periods_active = False
     T = None
 
