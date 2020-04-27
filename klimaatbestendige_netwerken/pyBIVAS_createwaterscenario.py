@@ -16,7 +16,6 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from shapely.ops import nearest_points
-from shapely.geometry import Point
 
 
 class CreateWaterScenario:
