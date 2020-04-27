@@ -15,7 +15,7 @@ class test_WaterdepthGrid(unittest.TestCase):
     waterlevelfile = Path('resources/wl_BRWL_rmmRef_Q1020.dep')
     waterdepthfile = Path('resources/dep_BRWL_rmmRef_Q1020.dep')
 
-    def setup(self):
+    def setUp(self):
         if not self.gridfile.exists():
             self.skipTest('Files could not be found')
 
@@ -72,7 +72,7 @@ class test_CreateWaterScenario(unittest.TestCase):
         },
     }
 
-    def setup(self):
+    def setUp(self):
         if not self.SOBEK_output_reachsegments.exists():
             self.skipTest('Files could not be found')
 
