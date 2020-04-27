@@ -21,20 +21,18 @@ logger = logging.getLogger(__name__)
 
 
 class ExceedanceLevels:
-
     return_periods_active = False
     T = None
-    outputfolder = Path('Figuren')
 
-    def __init__(self, timeseries: DataFrame, levels: list):
+    def __init__(self, timeseries: DataFrame, levels: list, outputfolder=Path('Figuren')):
         """
 
         :param timeseries: Pandas DataFrame (time-series)
         :param levels: list of levels
         :return:
         """
-        # labels_abs = [f'< {l} $m^3/s$' for l in levels]
-        # labels_abs.append('Alles')
+
+        self.outputfolder = outputfolder
 
         df = pd.DataFrame(index=levels, )
         df.index.name = 'Afvoerniveau'
@@ -53,7 +51,7 @@ class ExceedanceLevels:
             df_year[scenario] = _get_frequency_below_levels_per_year(timeseries[scenario], levels)
 
         self.df_year = df_year
-        pd.concat(df_year, axis=1).to_excel(self.outputfolder / 'Non_exceedance_yearly.xlsx')
+        pd.concat(df_year, axis=1).stack(level=0).to_excel(self.outputfolder / 'Non_exceedance_yearly.xlsx')
 
     def sort_df_year_by_one_level(self, level):
         """
@@ -83,6 +81,7 @@ class ExceedanceLevels:
                 df.columns = 1 / (df.columns / n_years)
 
                 self.return_periods_active = True
+                df.to_csv(self.outputfolder / f'Return_period_{scenario}.csv')
 
             self.df_year[scenario] = df
 
@@ -190,23 +189,40 @@ class ExceedanceLevels:
         df = self.df_year[yearplot_scenario].copy()
 
         levels = df.index
-        labels_diff = [f'{t1} tot {t2} $m^3/s$' for t1, t2 in zip(levels[:-1], levels[1:])]
-        labels_diff.insert(0, f'Tot {levels[0]} $m^3/s$')
-
+        labels_diff = [f'{t} $m^3/s$' for t in levels]
         df.index = labels_diff
-
         # Plot van terugkeertijden
         f, ax = plt.subplots(1, 1, figsize=(12, 5))
-        df.T.plot(logx=True, ax=ax, colormap='plasma', marker='o', markersize=2)
+        (df.T * 365).plot(logx=True, ax=ax, colormap='plasma', marker='o', markersize=2)
 
         plt.xlabel('Herhalingstijd')
-        plt.ylim(0, 1.01)
+        plt.ylim(0, 1.01 * 365)
         plt.xlim(1, 100)
         plt.grid(True, 'both')
-        plt.ylabel('Deel van het jaar')
+        plt.ylabel('Dagen onderschrijding')
         plt.legend(loc=6, bbox_to_anchor=(1, 0.5))
         ax.set_xticklabels([0, 1, 10, 100])
         plt.title(f'Terugkeertijd - {yearplot_scenario}')
+
+    def plot_return_period_perLevel(self, level):
+
+        d = {}
+        for s in self.df_year:
+            d[s] = self.df_year[s].loc[level]
+        df = pd.concat(d, axis=1)
+
+        # Plot van terugkeertijden
+        f, ax = plt.subplots(1, 1, figsize=(12, 5))
+        (df * 365).plot(logx=True, ax=ax, marker='o', markersize=2)
+
+        plt.xlabel('Herhalingstijd')
+        plt.ylim(0, 1.01 * 365)
+        plt.xlim(1, 100)
+        plt.grid(True, 'both')
+        plt.ylabel('Dagen onderschrijding')
+        plt.legend(loc=6, bbox_to_anchor=(1, 0.5))
+        ax.set_xticklabels([0, 1, 10, 100])
+        plt.title(f'Terugkeertijd - {level} $m^3/s$')
 
 
 # Private functions
