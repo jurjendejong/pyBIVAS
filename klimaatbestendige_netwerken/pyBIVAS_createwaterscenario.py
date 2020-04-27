@@ -106,7 +106,7 @@ class CreateWaterScenario:
                 })
 
         self.mapping = pd.DataFrame(koppeling)
-        self.mapping.to_csv('koppeling.csv')
+        return self.mapping
 
     def mapping_load(self, koppeling_csv):
         # TODO
@@ -141,7 +141,7 @@ class CreateWaterScenario:
         self.waterscenario.index.name = 'ArcID'
         self.waterscenario['SeasonID'] = self.waterscenario['SeasonID'].astype(int)
 
-        self.waterscenario.to_csv('waterscenario.csv')
+        return self.waterscenario
 
     def load_waterdepthgrids(self, gridfiles, waterdepth):
         logging.info('Loading and processing waterlevel grids')
@@ -202,7 +202,8 @@ class CreateWaterScenario:
                             b=BIVAS_arc
                         )
 
-        self.waterscenario.to_csv('waterscenario.csv')
+        return self.waterscenario
+
 
     @staticmethod
     def networkx_from_sobek3(SOBEK_network_file, exclude_sobek_reaches_from_network=None):
@@ -261,136 +262,3 @@ class CreateWaterScenario:
             return list_node2[id]
         else:
             return labels_node2[id]
-
-
-if __name__ == '__main__':
-    # from klimaatbestendige_netwerken.pyBIVAS_waterscenario import CreateWaterScenario
-    from pathlib import Path
-
-    inputdir = Path(r'../notebooks/waterscenario_input')
-
-    CWS = CreateWaterScenario()
-
-    SOBEK_output_reachsegments = inputdir / 'sobek' / 'output' / '2018' / 'Q1020' / 'reachsegments.nc'
-    SOBEK_output_gridpoints = inputdir / 'sobek' / 'output' / '2018' / 'Q1020' / 'gridpoints.nc'
-    SOBEK_network_file = inputdir / 'sobek' / 'NetworkDefinition.ini'
-
-    CWS.load_sobek(SOBEK_output_reachsegments, SOBEK_output_gridpoints, SOBEK_network_file,
-                   exclude_sobek_reaches_from_network=['VeesWap1', 'Ret_Wilpseklei'])
-
-    BIVAS_database = Path(r'..\..\..\Results\Bivas_2018_v3.db')
-
-    CWS.load_bivas(BIVAS_database)
-
-    sobek_reaches = {
-        'Bovenrijn': ('BovenLobith', 'Pannerdenschekop'),
-        'Waal': ('Pannerdenschekop', 'Hardinxveldboven'),
-        'Pannerdensch Kanaal': ('Pannerdenschekop', 'IJsselkop'),
-        'Nederrijn-Lek': ('IJsselkop', 'Ridderkerk'),
-        'IJssel': ('IJsselkop', 'IJsselmond')
-    }
-
-    bivas_reaches = {
-        'Bovenrijn': (150, 6855),
-        'Waal': (6855, 7083),
-        'Pannerdensch Kanaal': (6855, 6290),
-        'Nederrijn-Lek': (6290, 6775),
-        'IJssel': (6290, 2065)
-    }
-
-    CWS.create_mapping(bivas_reaches, sobek_reaches)
-
-    CWS.waterscenario_from_mapping()
-
-    gridfiles = {
-        'Bovenrijn-Waal': inputdir / 'grid' / 'Grid_BR-WL-RD.grd',
-        'Pannerdensch Kanaal': inputdir / 'grid' / 'Grid_PK-RD.grd',
-        'Nederrijn-Lek': inputdir / 'grid' / 'Grid_NR-LK-RD.grd',
-        'IJssel': inputdir / 'grid' / 'Grid_YS-RD.grd',
-    }
-
-    # waterdepth = {
-    #     'Bovenrijn-Waal': inputdir / 'waterdepth' / '2018' / 'Bovenrijn-Waal' / 'dep_BRWL_rmmRef_Q1020.dep',
-    #     'Pannerdensch Kanaal': inputdir / 'waterdepth' / '2018' / 'PannerdenschKanaal' / 'dep_PK_rmmRef_Q1020.dep',
-    #     'Nederrijn-Lek': inputdir / 'waterdepth' / '2018' / 'Nederrijn-Lek' / 'dep_NRLK_rmmRef_Q1020.dep',
-    #     'IJssel': inputdir / 'waterdepth' / '2018' / 'IJssel' / 'dep_YS_rmmRef_Q1020.dep',
-    # }
-    waterdepth = {
-        'Bovenrijn-Waal': inputdir / 'waterdepth' / 'dep_BRWL_rmmRef_Q1020.dep',
-        'Pannerdensch Kanaal': inputdir / 'waterdepth' / 'dep_PK_rmmRef_Q1020.dep',
-        'Nederrijn-Lek': inputdir / 'waterdepth' / 'dep_NRLK_rmmRef_Q1020.dep',
-        'IJssel': inputdir / 'waterdepth' / 'dep_YS_rmmRef_Q1020.dep',
-    }
-
-    CWS.load_waterdepthgrids(gridfiles, waterdepth)
-
-
-    # Input dict. The key is just convenience and is not used anywhere
-    sections = {
-        'Boven-Rijn': {
-            'point_start': Point(207173.038, 428980.794),
-            'point_end': Point(200143.318, 431638.797),
-            'channel_width': 150,
-            'min_channel_width': 0,
-            'min_channel_depth': 0,
-            'grid': 'Bovenrijn-Waal',
-        },
-        'Waal': {
-            'point_start': Point(200143.318, 431638.797),
-            'point_end': Point(120797.078, 425747.021),
-            'channel_width': 150,
-            'min_channel_width': 0,
-            'min_channel_depth': 0,
-            'grid': 'Bovenrijn-Waal',
-        },
-        'Pannerdensch Kanaal': {
-            'point_start': Point(200143.318, 431638.797),
-            'point_end': Point(193925.918, 440312.965),
-            'channel_width': 70,
-            'min_channel_width': 0,
-            'min_channel_depth': 0,
-            'grid': 'Pannerdensch Kanaal',
-        },
-        'Nederrijn_totDriel': {
-            'point_start': Point(193925.918, 440312.965),
-            'point_end': Point(183832.261,441768.265),
-            'channel_width': 70,
-            'min_channel_width': 20,
-            'min_channel_depth': 2.5,
-            'grid': 'Pannerdensch Kanaal',
-        },
-        'Nederrijn_vanafDriel': {
-            'point_start': Point(183832.261,441768.265),
-            'point_end': Point(102723.085, 433720.133),
-            'channel_width': 80,
-            'min_channel_width': 40,
-            'min_channel_depth': 2.5,
-            'grid': 'Nederrijn-Lek',
-        },
-        'IJssel_1': {
-            'point_start': Point(193925.918, 440312.965),
-            'point_end': Point(210029.578, 464734.952),
-            'channel_width': 40,
-            'min_channel_width': 20,
-            'min_channel_depth': 2.5,
-            'grid': 'IJssel',
-        },
-        'IJssel_2': {
-            'point_start': Point(210029.578, 464734.952),
-            'point_end': Point(205247.154, 489608.577),
-            'channel_width': 50,
-            'min_channel_width': 20,
-            'min_channel_depth': 2.5,
-            'grid': 'IJssel',
-        },
-        'IJssel_3': {
-            'point_start': Point(205247.154, 489608.577),
-            'point_end': Point(185908.998, 510582.501),
-            'channel_width': 65,
-            'min_channel_width': 30,
-            'min_channel_depth': 2.5,
-            'grid': 'IJssel',
-        },
-    }
-
-    CWS.waterdepth_from_grids(sections)
