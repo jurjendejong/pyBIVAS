@@ -601,13 +601,13 @@ class pyBIVAS:
 
         G = nx.from_pandas_edgelist(
             arcs, 'FromNodeID', 'ToNodeID', edge_attr=True)
-        for n in nodes.iterrows():
-            if n[0] in G.node:
-                G.node[n[0]]['X'] = n[1]['XCoordinate']
-                G.node[n[0]]['Y'] = n[1]['YCoordinate']
+        for node_id, node_values in nodes.iterrows():
+            if node_id in G.node:
+                G.node[node_id]['X'] = node_values['XCoordinate']
+                G.node[node_id]['Y'] = node_values['YCoordinate']
             else:
                 pass
-                print('Node {} is not connected to any edge'.format(n[0]))
+                print('Node {} is not connected to any edge'.format(node_id))
         self.NetworkX = G
         return self.NetworkX
 
