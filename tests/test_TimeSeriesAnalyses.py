@@ -14,7 +14,7 @@ class test_TimeSeriesAnalyses(unittest.TestCase):
         outputfolder = Path(r'export_TimeSeriesAnalyses_Maas')
 
         if not excelfile.exists():
-            unittest.SkipTest('Inputfile does not exist')
+            self.SkipTest('Inputfile does not exist')
 
         if not outputfolder.exists():
             outputfolder.mkdir()
