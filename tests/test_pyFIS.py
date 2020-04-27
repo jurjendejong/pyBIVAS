@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.DEBUG)
 class test_pyFIS(unittest.TestCase):
     """Tests for `klimaatbestendige_netwerken` package."""
 
-    skipSlowRuns = False
+    skipSlowRuns = True
 
     export_dir = Path('export_pyFIS')
 
