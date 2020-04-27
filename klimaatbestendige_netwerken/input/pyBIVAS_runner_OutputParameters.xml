@@ -21,7 +21,7 @@
         <Change>Enabled</Change>
     </ArcStatistics>
     <ArcUsage>
-        <Change>Neutral</Change>
+        <Change>Enabled</Change>
     </ArcUsage>
     <ArcUsageDetails>
         <Change>Enabled</Change>
@@ -33,7 +33,7 @@
         <Change>Neutral</Change>
     </DestinationTripEndPoint>
     <CountingPoint>
-        <Change>Neutral</Change>
+        <Change>Enabled</Change>
     </CountingPoint>
     <WaitingTime>
         <Change>Enabled</Change>
@@ -42,6 +42,6 @@
         <Change>Enabled</Change>
     </Emission>
     <ReferenceComparison>
-        <Change>Neutral</Change>
+        <Change>Enabled</Change>
     </ReferenceComparison>
 </Output>

@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 import xml.dom.minidom
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -96,9 +97,17 @@ class BIVAS_runner():
             sql = """UPDATE parameters SET WaterScenarioID = NULL WHERE 1"""
             c.execute(sql)
 
-        # Rename scenario
-        sql = """UPDATE scenarios SET Name = "{}" WHERE ID = {}""".format(
-            self.scenarioName, self.scenarioID)
+        # Set scenario name and description
+        date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficScenarioID}'
+
+        sql = """
+        UPDATE scenarios
+        SET Name = "{}"
+            Description = "{}"
+        WHERE ID = {}
+        """.format(
+            self.scenarioName, description, self.scenarioID)
         c.execute(sql)
 
         # Update traffic Scenario. I'm simply updating all scenarios
