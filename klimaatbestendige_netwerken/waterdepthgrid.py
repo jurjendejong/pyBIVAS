@@ -17,20 +17,17 @@ logging.basicConfig(level=logging.INFO)
 
 
 class WaterdepthGrid:
-    grid = None
-    bedlevel = None
-    waterlevel = None
-    waterdepth = None
 
-    gpd = None
-    ZW_table = {}
-    pd_sections = None
-
-    export_shapefiles = False
 
     def __init__(self):
+        self.grid = None
+        self.bedlevel = None
+        self.waterlevel = None
+        self.waterdepth = None
 
-        pass
+        self.gpd = None
+        self.ZW_table = {}
+        self.pd_sections = None
 
     def load_grid(self, gridfile):
         logging.info(f'Loading grid: {gridfile}')
@@ -124,7 +121,6 @@ class WaterdepthGrid:
         """
 
         all_n_rows = sorted(self.gpd['n'].unique())
-        self.ZW_table = {}
 
         for n_row in all_n_rows:
             logging.debug(f'Processing n-row: {n_row}')
