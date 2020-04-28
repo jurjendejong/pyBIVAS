@@ -12,10 +12,8 @@ logger.setLevel(logging.INFO)
 
 
 class pyBIVAS_plot_compare:
-    BIVAS_connection = {}
 
     Arcs = pyBIVAS.Arcs
-    outputdir = Path('.')
 
     def __init__(self, BIVAS_simulations: dict, scenarioID=None):
         """
@@ -25,6 +23,10 @@ class pyBIVAS_plot_compare:
         self.BIVAS_simulations = BIVAS_simulations
         self.reference = list(BIVAS_simulations.keys())[0]
         self.scenarioID = scenarioID
+
+        # Empty inits
+        self.outputdir = Path('.')
+        self.BIVAS_connection = {}
 
     def connect_all(self):
         for name, path in self.BIVAS_simulations.items():
@@ -101,7 +103,7 @@ class pyBIVAS_plot_compare:
         ax[1].legend(loc='center left', bbox_to_anchor=(1.07, 0.5), facecolor='w', title='', )
         plt.savefig(self.outputdir / f'Tijdserie_{label}', dpi=300, bbox_inches='tight')
 
-    def plot_routes(self, routes, limit=100, shuffle=True):
+    def plot_routes(self, routes, limit=100, shuffle=False):
         """"
         Compare first and second simulation for routes.
         Possible options for routes:
@@ -113,6 +115,7 @@ class pyBIVAS_plot_compare:
             [list_of_arcID]
 
         TODO: include option to only show one simulation, or more than 2
+        TODO: add NST2007, Beladingsgraad (2x),
         """
 
         for name, BIVAS in self.BIVAS_connection.items():
@@ -199,8 +202,8 @@ class pyBIVAS_plot_compare:
         if shuffle:
             random.shuffle(all_routes)
 
-        background_shapefile = r'c:\Projecten\KBN\klimaatbestendige_netwerken\tests\resources\backgroundmap\\nl_provincies_poly.shp'
-        rivers_shapefile = r'c:\Projecten\KBN\klimaatbestendige_netwerken\tests\resources\backgroundmap\rivers_NL.shp'
+        background_shapefile = Path(__file__).parent.parent / r'tests\resources\backgroundmap\\nl_provincies_poly.shp'
+        rivers_shapefile = Path(__file__).parent.parent / r'tests\resources\backgroundmap\rivers_NL.shp'
         background = geopandas.read_file(background_shapefile)
         river_background = geopandas.read_file(rivers_shapefile)
 
@@ -208,7 +211,7 @@ class pyBIVAS_plot_compare:
         case = list(self.BIVAS_connection.keys())[1]
 
         for routes in all_routes[:limit]:
-            print('Plotting Route: {}'.format(routes))
+            logger.info('Plotting Route: {}'.format(routes))
 
             # Background map
             background.plot(figsize=(14, 14), color='#DDDDDD', edgecolor='#BBBBBB')
@@ -222,7 +225,7 @@ class pyBIVAS_plot_compare:
             route = self.BIVAS_connection[ref].route_arcs(routes)
             routestats = self.BIVAS_connection[ref].route_stats(routes)
             if len(route) == 0:
-                print('Skipping because route has not taken place')
+                logger.warning('Skipping because route has not taken place')
                 continue
             startpoint, endpoint = getStartEnd(route)
             referencestrips = self.BIVAS_connection[ref].route_countingpoints(routes, route)
