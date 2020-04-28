@@ -9,13 +9,13 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
-import datetime
 import sqlite3
 import pandas as pd
 import requests
 import xml.dom.minidom
 import logging
 from datetime import datetime
+from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -49,7 +49,7 @@ class BIVAS_runner():
             shutil.copyfile(BIVAS_database_file, self.BIVAS_installation_dir / 'Bivas.db')
         assert self.BIVAS_database.exists(), 'BIVAS database not found'
 
-    def prepare_database(self, waterscenario=None, trafficScenarioID=None):
+    def prepare_database(self, waterscenario=None, trafficScenario=None):
         """
         This function copys the reference databasefile to the rundir
         It updates the database with the new waterscenario
@@ -57,12 +57,18 @@ class BIVAS_runner():
 
         waterscenario - Path to waterscenario csv - file
 
+        TODO: Update this to work through API
+
         """
 
         # Validate input
         if waterscenario:
             waterscenario = Path(waterscenario)
             assert waterscenario.exists(), 'Waterscenario file not found'
+
+        BIVAS = pyBIVAS(self.BIVAS_database)
+        df_trafficscenarios = BIVAS.trafficscenario_numberoftrips()
+
 
         # Do changes to database:
         con = sqlite3.connect(self.BIVAS_database)
@@ -74,12 +80,14 @@ class BIVAS_runner():
             sql = "DELETE FROM water_scenario_values WHERE 1"
             c.execute(sql)
 
+            sql = "DELETE FROM water_scenarios WHERE 1"
+            c.execute(sql)
+
             # Write waterdata to database
 
             # Read waterscenario file
-            df = pd.read_csv(waterscenario, header=None, index_col=None)
-            df.columns = ['ArcID', 'SeasonID', 'WaterLevel__m',
-                          'RateOfFlow__m3_s', 'WaterSpeed__m_s', 'WaterDepth__m']
+            df = pd.read_csv(waterscenario, header=0, index_col=None)
+            df = df['ArcID', 'SeasonID', 'WaterLevel__m', 'RateOfFlow__m3_s', 'WaterSpeed__m_s', 'WaterDepth__m']
             df['WaterScenarioID'] = 1
 
             # Add new water_scenario
@@ -87,10 +95,27 @@ class BIVAS_runner():
                       if_exists='append', index=False)
 
             # Rename water_scenario
-            waterscenario_name = waterscenario.stem
-            sql = """UPDATE water_scenarios SET Description = "{}" WHERE ID = {}""".format(
-                waterscenario_name, waterscenario)
+            # waterscenario_name = waterscenario.stem
+            # sql = """UPDATE water_scenarios SET Description = "{}" WHERE ID = {}""".format(
+                # waterscenario_name, waterscenario)
+            # c.execute(sql)
+
+
+            waterscenario_id = 1
+            waterscenario_name = 'TEST waterscenario'
+            waterscenario_type = 1
+            sql = """INSERT into water_scenarios VALUES ({}, '{}', {})""".format(
+                        waterscenario_id,
+                        waterscenario_name,
+                        waterscenario_type
+                    )
             c.execute(sql)
+
+            # Remove water scenario. I'm simply updating all scenarios
+            # Otherwise I should check the BranchSet structure
+            sql = """UPDATE parameters SET WaterScenarioID = 1 WHERE 1"""
+            c.execute(sql)
+
         else:
             # Remove water scenario. I'm simply updating all scenarios
             # Otherwise I should check the BranchSet structure
@@ -99,11 +124,11 @@ class BIVAS_runner():
 
         # Set scenario name and description
         date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficScenarioID}'
+        description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficScenario},'
 
         sql = """
         UPDATE scenarios
-        SET Name = "{}"
+        SET Name = "{}",
             Description = "{}"
         WHERE ID = {}
         """.format(
@@ -112,10 +137,14 @@ class BIVAS_runner():
 
         # Update traffic Scenario. I'm simply updating all scenarios
         # Otherwise I should check the BranchSet structure
-        if trafficScenarioID:
-            sql = """UPDATE parameters SET TrafficScenarioID = "{}" WHERE 1""".format(
-                trafficScenarioID, self.scenarioID)
-            c.execute(sql)
+        if trafficScenario:
+            if isinstance(trafficScenario, int):
+                sql = """UPDATE parameters SET TrafficScenarioID = "{}" WHERE 1""".format(trafficScenario)
+                c.execute(sql)
+            else:
+                trafficScenarioID = df_trafficscenarios.index[df_trafficscenarios['Description'] == trafficScenario][0]
+                sql = """UPDATE parameters SET TrafficScenarioID = "{}" WHERE 1""".format(trafficScenarioID)
+                c.execute(sql)
 
         con.commit()
         con.close()
@@ -151,18 +180,36 @@ class BIVAS_runner():
         d = None
         while not d:
             d = requests.get(url, data=data, headers=headers, verify=False)
-            logger.info('{}: Waiting for BIVAS to finish...'.format(datetime.datetime.now()))
+            logger.info('{}: Waiting for BIVAS to finish...'.format(datetime.now()))
             time.sleep(60)
 
         logger.info(xml_to_string(d.text))
 
-        logger.info('{}: Finished!'.format(datetime.datetime.now()))
+        logger.info('{}: Finished!'.format(datetime.now()))
 
         # Close BIVAS
         logger.info('Closing BIVAS')
         os.system('taskkill /f /im Bivas.exe')
         time.sleep(5)
 
+
+# class BIVAS_API:
+#
+#     post_headers = {'Content-Type': 'application/xml; charset=UTF-8'}
+#     get_headers = {'Accept': 'application/xml'}
+#
+#     def __init__(self):
+#         self.bivas_url='http://127.0.0.1'
+#
+#     def post_calculation(self, scenario_id, xmlfile_outputsettings):
+#         url = self.bivasurl + '/Scenarios/' + str(scenario_id) + '/Calculate'
+#         with open(outputsettingsfile, 'rb') as data:
+#             requests.post(url, data=data, headers=post_headers, verify=False)
+#
+#     def get_output_overallstatistics(self, scenario_id):
+#         url = self.bivasurl + '/Scenarios/' + str(scenario_id) + '/Output/OverallStatistics'
+#         d = requests.get(url, data=None, headers=self.get_headers, verify=False)
+#         return d
 
 def xml_to_string(xmlstring):
     xmldom = xml.dom.minidom.parseString(xmlstring)
