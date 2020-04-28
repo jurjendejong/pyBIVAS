@@ -87,7 +87,7 @@ class BIVAS_runner():
 
             # Read waterscenario file
             df = pd.read_csv(waterscenario, header=0, index_col=None)
-            df = df['ArcID', 'SeasonID', 'WaterLevel__m', 'RateOfFlow__m3_s', 'WaterSpeed__m_s', 'WaterDepth__m']
+            df = df[['ArcID', 'SeasonID', 'WaterLevel__m', 'RateOfFlow__m3_s', 'WaterSpeed__m_s', 'WaterDepth__m']]
             df['WaterScenarioID'] = 1
 
             # Add new water_scenario
