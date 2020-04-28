@@ -10,9 +10,10 @@ import networkx as nx
 import sqlite3
 import numpy as np
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 try:
     import geopandas
@@ -102,7 +103,10 @@ class pyBIVAS:
         Connect to sqlite3 databasefile (.db)
         """
         logger.info('Loading database: {}'.format(databasefile))
-        self.databasefile = databasefile
+
+        self.databasefile = Path(databasefile)
+        assert self.databasefile.exists(), 'Database does not exist'
+
         self.connection = sqlite3.connect(self.databasefile)
         return self.connection
 
@@ -541,6 +545,8 @@ class pyBIVAS:
         various information about those vessels
 
         NOTE: Not all columns give proper info when using groupby
+
+        TODO: Add functionality to add multiple arcID and to include an exclude_ardID like with route_stats
         """
         if not group_by:
             group_by = 'trips.ID'
@@ -790,8 +796,10 @@ class pyBIVAS:
         return df
 
     def node_timeseries(self, NodeID, trafficScenarioId):
+
         dfs = {}
         for d in ['Origin', 'Destination']:
+
             sql = f"""
                     SELECT
                     DATE(trips.DateTime) AS "Days",
@@ -801,17 +809,22 @@ class pyBIVAS:
                         AND {d}TripEndPointNodeID={NodeID}
                     GROUP BY "Days"
                     """
+
             df = self.sql(sql)
 
             # Format data
             df['Days'] = pd.to_datetime(df['Days'])
             df = df.set_index('Days')
             df = df['nTrips']
-
+            if df.shape[0] == 0:
+                continue
             fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
             dfs[d] = df.reindex(fullyear, fill_value=0)
 
-        df = pd.concat(dfs, axis=1)
+        if len(dfs):
+            df = pd.concat(dfs, axis=1)
+        else:
+            df = None
         return df
 
     def node_label(self, NodeID):
@@ -828,6 +841,7 @@ class pyBIVAS:
                 LIMIT 0, 1
                 """
         label = self.sql(sql).iloc[0, 0]
+        label = label.replace('/', '-')
         return label
 
     """
@@ -893,19 +907,123 @@ class pyBIVAS:
         self.nodes = nodes
         return self.nodes
 
+    def zone_list(self, zone_definition='BasGoed 2018'):
+        """
+        Return list of all zones for given definitionID
+        :return:
+        """
+        sql = f"""
+        SELECT zones.Name
+        FROM zones
+        LEFT JOIN zone_definitions ON zones.ZoneDefinitionID=zone_definitions.ID
+        WHERE zone_definitions.Name = "{zone_definition}"
+        """
+        zones = self.sql(sql)
+        return zones
+
+    def zone_timeseries(self, zone_name, trafficScenarioId, zone_definition='BasGoed 2018'):
+
+        dfs = {}
+        for d in ['Origin', 'Destination']:
+
+            sql = f"""SELECT ID FROM zone_definitions WHERE Name = "{zone_definition}" """
+            zone_definition_id = self.sql(sql).iloc[0, 0]
+
+            sql = f"""
+                    SELECT
+                    DATE(trips.DateTime) AS "Days",
+                    count(*) AS nTrips
+                    FROM trips
+                    LEFT JOIN zone_node_mapping ON trips.{d}TripEndPointNodeID = zone_node_mapping.NodeID
+                    LEFT JOIN zones ON zone_node_mapping.ZoneID = zones.ID
+                    LEFT JOIN zone_definitions ON zone_definitions.ID = zone_node_mapping.ZoneID
+                    WHERE trips.TrafficScenarioID={trafficScenarioId}
+                    AND zones.ZoneDefinitionID={zone_definition_id}
+                    AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
+                    AND zones.Name = "{zone_name}"
+                    GROUP BY "Days"
+            """
+            df = self.sql(sql)
+
+            # Format data
+            df['Days'] = pd.to_datetime(df['Days'])
+            df = df.set_index('Days')
+            df = df['nTrips']
+            if df.shape[0] == 0:
+                continue
+            fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
+            dfs[d] = df.reindex(fullyear, fill_value=0)
+
+        if len(dfs):
+            df = pd.concat(dfs, axis=1)
+        else:
+            df = None
+        return df
+
+    def zone_statistics(self, zone_name, zone_definition, trafficScenarioId, groupby_field, groupby_sort, directions):
+        """
+        Get statistics for trips in traffic scenario at a zone
+
+        zone_name: name of zone
+        zone_definition: zone_definition_name
+        trafficScenarioId: trafficScenarioId
+        groupby_field: like 'nstr_mapping.GroupCode'
+        groupby_sort: can be identical to groupby_field, or a different field in the table
+        directions: can be either ['Origin', 'Destination'], ['Origin'] or ['Destination']
+        """
+
+        sql = f"""SELECT ID FROM zone_definitions WHERE Name = "{zone_definition}" """
+        zone_definition_id = self.sql(sql).iloc[0, 0]
+
+        dfs = {}
+        for d in directions:
+            sql = f"""
+                     SELECT
+                     {groupby_field} AS groupby,
+                     count(*) AS nTrips
+                     FROM trips
+
+                     LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                     LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
+                     LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                     LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
+                     LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
+                     LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
+                     LEFT JOIN zone_node_mapping ON trips.{d}TripEndPointNodeID = zone_node_mapping.NodeID
+                     LEFT JOIN zones ON zone_node_mapping.ZoneID = zones.ID
+                     LEFT JOIN zone_definitions ON zone_definitions.ID = zone_node_mapping.ZoneID
+                     WHERE TrafficScenarioID={trafficScenarioId}
+                     AND zones.ZoneDefinitionID={zone_definition_id}
+                     AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
+                     AND zones.Name = "{zone_name}"
+                     GROUP BY {groupby_field}
+                     ORDER BY {groupby_sort}
+                     """
+            df = self.sql(sql)
+
+            # Format data
+            df = df.set_index('groupby')
+            dfs[d] = df['nTrips']
+
+        df = pd.concat(dfs, axis=1, sort=False).sum(axis=1)
+
+        if groupby_field == 'nstr_mapping.GroupCode':
+            df.rename(self.NSTR_shortnames, inplace=True)
+        return df
+
     def countingpoint_list(self):
         """
         Returns list of all counting points including coordinates
         """
-        sql = """
-        SELECT
-        counting_points.Name AS Name,
-        counting_point_arcs.ArcID as ArcID
-        FROM counting_points
-        LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
-        WHERE counting_points.DirectionID >0
-        GROUP BY counting_points.Name
-        """
+        sql =   """
+                SELECT
+                counting_points.Name AS Name,
+                counting_point_arcs.ArcID as ArcID
+                FROM counting_points
+                LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
+                WHERE counting_points.DirectionID >0
+                GROUP BY counting_points.Name
+                """
         countingPoints = self.sql(sql)
         arcs = self.network_arcs()
         arcs = arcs[['Name', 'XM', 'YM']]
@@ -940,6 +1058,11 @@ class pyBIVAS:
 
         df['Days'] = pd.to_datetime(df['Days'])
         df = df.set_index('Days')
+
+        # If not returning here, it will crash
+        if df.shape[0] == 0:
+            return df
+
         if per_direction:
             df = df.pivot(columns='Vaarrichting')
             df.rename(mapper=self.directions_dutch, inplace=True)
