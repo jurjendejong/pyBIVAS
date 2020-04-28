@@ -50,7 +50,7 @@ class TestpyBIVAS_plot(TestCase):
 
 
 class Test_IVS90_analyse(TestCase):
-    database_file = Path(r'resources/Bivas_2018_v2.db')
+    database_file = Path(r'resources/Bivas_2018_v3.db')
 
     def setUp(self):
         # Test if database exists
@@ -67,23 +67,30 @@ class Test_IVS90_analyse(TestCase):
             self.BIVAS.outputdir.mkdir()
 
     def test_plot_CountingPointsForYear(self):
-        self.BIVAS.plot_CountingPointsForYear()
+        self.BIVAS.plot_countingpoint_timeseries()
 
     def test_plot_CEMTclassesForYear(self):
-        self.BIVAS.plot_CEMTclassesForYear()
+        self.BIVAS.plot_countingpoint_piechart_CEMTclasses()
 
     def test_plot_YearlyChanges_Timeseries(self):
-        self.BIVAS.plot_YearlyChanges_Timeseries()
+        self.BIVAS.plot_countingpoint_montlytimeseries_yearlychanges()
 
     def test_plot_YearlyChangesCEMT(self):
-        self.BIVAS.plot_YearlyChangesCEMT()
+        self.BIVAS.plot_countingpoint_YearlyChangesCEMT()
+
+    def test_plot_timeseries_zone(self):
+        self.BIVAS.plot_zone_timeseries(jaar=2011, zone_name="Maasvlakte_I_II")
 
     def test_plot_timeseries_node(self):
-        self.BIVAS.plot_timeseries_node(jaar=2011, NodeID=21639)
+        self.BIVAS.plot_node_timeseries(jaar=2011, NodeID=21639)
 
     def test_plot_piechart_node(self):
-        self.BIVAS.plot_piechart_node(groupby='NSTR', jaar=2011, NodeID=21639)
-        self.BIVAS.plot_piechart_node(groupby='ship_types', jaar=2011, NodeID=21639)
+        self.BIVAS.plot_nodezone_piechart(groupby='NSTR', jaar=2011, NodeID=21639)
+        self.BIVAS.plot_nodezone_piechart(groupby='ship_types', jaar=2011, NodeID=21639)
+
+    def test_plot_piechart_zone(self):
+        self.BIVAS.plot_nodezone_piechart(groupby='NSTR', jaar=2011, zone_name="Maasvlakte_I_II")
+        self.BIVAS.plot_nodezone_piechart(groupby='ship_types', jaar=2011, zone_name="Maasvlakte_I_II")
 
     def test_export_shapefile_nodesstats(self):
-        self.BIVAS.export_shapefile_nodesstats(jaar=2011)
+        self.BIVAS.export_node_stats_shapefile(jaar=2011)

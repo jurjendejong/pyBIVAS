@@ -24,8 +24,6 @@ class pyBIVAS_plot(pyBIVAS):
     Append the class pyBIVAS with plotting functions
     """
 
-    outputdir = Path('.')
-
     # Arcs in BIVAS 4.4
     Arcs = {
         'BovenRijn': 9204,
@@ -56,6 +54,11 @@ class pyBIVAS_plot(pyBIVAS):
         'Kanaal van St. Andries': 7378,
         'Prins Bernhardsluizen in Betuwepand': 1705
     }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.outputdir = Path('.')
+
 
     def plot_Trips_Arc_all(self):
         for label, arcID in self.Arcs.items():
@@ -462,7 +465,6 @@ class pyBIVAS_plot(pyBIVAS):
 
 
 class IVS90_analyse(pyBIVAS_plot):
-    outputdir = Path('.')
 
     def __init__(self,
                  databasefile=None,
@@ -476,7 +478,9 @@ class IVS90_analyse(pyBIVAS_plot):
         traffic_scenarios = self.sql(sql)
 
         if traffic_scenario_ids:
+            traffic_scenarios.set_index('ID', inplace=True)
             traffic_scenarios = traffic_scenarios.loc[traffic_scenario_ids]
+            traffic_scenarios.reset_index(inplace=True)
 
         sql = """SELECT * FROM reference_trip_sets"""
         reference_trip_sets = self.sql(sql).set_index('ID')
@@ -495,8 +499,9 @@ class IVS90_analyse(pyBIVAS_plot):
         self.cemt_order = self.CEMTclass()['Description']
         self.ship_types_order = self.shiptypes()['Description']
 
+
     # Jaarlijkse variatie
-    def plot_CountingPointsForYear(self, telpunt='Prins Bernhardsluis', jaar=2018):
+    def plot_countingpoint_timeseries(self, telpunt='Prins Bernhardsluis', jaar=2018):
         figdir = self.outputdir / 'figures_CountingPointsForYear'
         if not figdir.exists():
             figdir.mkdir()
@@ -524,7 +529,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         plt.close()
 
-    def plot_CEMTclassesForYear(self, telpunt='Prins Bernhardsluis', jaar=2018):
+    def plot_countingpoint_piechart_CEMTclasses(self, telpunt='Prins Bernhardsluis', jaar=2018):
         """
         Opbouw vaarbewegingen voor telpunt en jaar
         """
@@ -545,7 +550,12 @@ class IVS90_analyse(pyBIVAS_plot):
             return 'No data'
 
         # Plot data
-        df.plot.pie(stacked=True, figsize=(6, 6), cmap='coolwarm', wedgeprops={'edgecolor': 'w'})
+
+        # Only label where the bin is larger than 5%
+        only_large_labels = [k if v / df.max() > 0.03 else '' for k, v in df.iteritems()]
+
+        df.plot.pie(stacked=True, figsize=(6, 6), cmap='coolwarm', wedgeprops={'edgecolor': 'w'},
+                    labels=only_large_labels)
         plt.title('{} - {}'.format(telpunt, jaar))
         plt.grid()
         plt.ylabel('Verdeling CEMT klasse (naar aantal passages)')
@@ -555,7 +565,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         plt.close()
 
-    def plot_YearlyChanges_Timeseries(self, telpunt='Prins Bernhardsluis'):
+    def plot_countingpoint_montlytimeseries_yearlychanges(self, telpunt='Prins Bernhardsluis'):
         figdir = self.outputdir / 'figures_YearlyChanges_Timeseries'
         if not figdir.exists():
             figdir.mkdir()
@@ -598,7 +608,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         plt.close()
 
-    def plot_YearlyChangesCEMT(self, telpunt='Born sluis'):
+    def plot_countingpoint_YearlyChangesCEMT(self, telpunt='Born sluis'):
         figdir = self.outputdir / 'figures_YearlyChangesCEMT'
         if not figdir.exists():
             figdir.mkdir()
@@ -637,7 +647,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         plt.close()
 
-    def export_shapefile_nodesstats(self, jaar):
+    def export_node_stats_shapefile(self, jaar):
         trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
         nodes = self.network_nodes()
         stats = self.node_statistics_all(trafficScenarioId)
@@ -651,7 +661,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
 
 
-    def plot_timeseries_node(self, jaar=2011, NodeID=21639, label=None):
+    def plot_node_timeseries(self, jaar=2011, NodeID=21639, label=None):
         """
         Create timeserie of the number of ships departing and arriving at given node in given year.
 
@@ -670,12 +680,12 @@ class IVS90_analyse(pyBIVAS_plot):
 
         # Query data
         df = self.node_timeseries(NodeID, trafficScenarioId)
-        if len(df)==0:
+        if df is None:
             return 'No data'
 
         # Format
         rename_mapper = {'Origin': 'Herkomst', 'Destination': 'Bestemming'}
-        df = df.rename(mapper=rename_mapper, axis=1)[rename_mapper.values()]
+        df = df.rename(mapper=rename_mapper, axis=1).reindex(rename_mapper.values(), axis=1)
 
         if not label:
             label = self.node_label(NodeID)
@@ -687,12 +697,50 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('Aantal schepen')
         plt.ylim(bottom=0)
 
-        plt.savefig(figdir / f'TijdserieNode_{NodeID}_{label}.png', dpi=300, bbox_inches='tight')
-        df.to_csv(figdir / f'TijdserieNode_{NodeID}_{label}.csv')
+        plt.savefig(figdir / f'TijdserieNode_{NodeID}_{label}_{jaar}.png', dpi=300, bbox_inches='tight')
+        df.to_csv(figdir / f'TijdserieNode_{NodeID}_{label}_{jaar}.csv')
 
         plt.close()
 
-    def plot_piechart_node(self, groupby='NSTR', jaar=2011, NodeID=21639, label=None, directions=['Origin', 'Destination']):
+    def plot_zone_timeseries(self, jaar, zone_name):
+        """
+        Create timeserie of the number of ships departing and arriving at given node in given year.
+
+        jaar: labeled traffic scenario
+        zone
+
+        """
+        figdir = self.outputdir / 'figures_timeseries_zone'
+        if not figdir.exists():
+            figdir.mkdir()
+
+        logger.info(f'Plotting timeseries_node voor zone: {zone_name}, jaar: {jaar}')
+
+        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+
+        # Query data
+        df = self.zone_timeseries(zone_name, trafficScenarioId)
+        if df is None:
+            return 'No data'
+
+        # Format
+        rename_mapper = {'Origin': 'Herkomst', 'Destination': 'Bestemming'}
+        df = df.rename(mapper=rename_mapper, axis=1).reindex(rename_mapper.values(), axis=1)
+
+        # Plot
+        df.plot(kind='area', stacked=True, figsize=(16, 6))
+        plt.title(f'Locatie: {zone_name}, jaar: {jaar}')
+        plt.grid()
+        plt.ylabel('Aantal schepen')
+        plt.ylim(bottom=0)
+
+        plt.savefig(figdir / f'TijdserieZone_{zone_name}_{jaar}.png', dpi=300, bbox_inches='tight')
+        df.to_csv(figdir / f'TijdserieZone_{zone_name}_{jaar}.csv')
+
+        plt.close()
+
+    def plot_nodezone_piechart(self, groupby='NSTR', jaar=2011, NodeID=None, zone_name=None, label=None,
+                               zone_definition='BasGoed 2018', directions=['Origin', 'Destination']):
         """
         Create timeserie of the number of ships departing and arriving at given node in given year.
 
@@ -702,13 +750,16 @@ class IVS90_analyse(pyBIVAS_plot):
         groupby: 'ship_types' or 'NSTR'
         directions: can be either ['Origin', 'Destination'], ['Origin'] or ['Destination']
         """
-        figdir = self.outputdir / 'figures_piechart_node'
-        if not figdir.exists():
-            figdir.mkdir()
 
-        logger.info(f'Plotting piechart voor node: {NodeID}, jaar: {jaar}')
 
-        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+        if NodeID is not None:
+            figdir = self.outputdir / 'figures_piechart_node'
+            logger.info(f'Plotting piechart voor node: {NodeID}, jaar: {jaar}')
+        else:
+            figdir = self.outputdir / 'figures_piechart_zone'
+            logger.info(f'Plotting piechart voor zone: {zone_name}, jaar: {jaar}')
+        figdir.mkdir(exist_ok=True)
+
 
         # Query
         if groupby == 'ship_types':
@@ -721,51 +772,81 @@ class IVS90_analyse(pyBIVAS_plot):
             logger.error(f'Groupby {groupby} not implemented')
             return
 
-        df = self.node_statistics(NodeID=NodeID, trafficScenarioId=trafficScenarioId, groupby_field=groupby_field,
+        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+
+        if NodeID is not None:
+            df = self.node_statistics(NodeID=NodeID, trafficScenarioId=trafficScenarioId, groupby_field=groupby_field,
                                   groupby_sort=groupby_sort, directions=directions)
+
+            if not label:
+                label = self.node_label(NodeID)
+        else:
+            df = self.zone_statistics(zone_name=zone_name, zone_definition=zone_definition,
+                                      trafficScenarioId=trafficScenarioId, groupby_field=groupby_field,
+                                      groupby_sort=groupby_sort, directions=directions)
+            label = zone_name
+
         if len(df)==0:
             return 'No data'
 
-        if not label:
-            label = self.node_label(NodeID)
-
         # Plot
         # Only label where the bin is larger than 5%
-        only_large_labels = [k if v / df.max() > 0.05 else '' for k, v in df.iteritems()]
+        only_large_labels = [k if v / df.max() > 0.03 else '' for k, v in df.iteritems()]
 
-        df.plot.pie(wedgeprops={'width': 1.0}, labels=only_large_labels, counterclock=False, startangle=90)
+        df.plot.pie(wedgeprops={'width': 1.0, 'edgecolor': 'w'}, labels=only_large_labels, counterclock=False, startangle=90,
+                    cmap='tab20c')
         plt.ylabel('')
         plt.title(f'Scheepvaart van en naar: {label}')
 
-        plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
-        df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.csv', header=False)
+        if NodeID is not None:
+            plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
+            df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.csv', header=False)
+        else:
+            plt.savefig(figdir / f'PiechartZone_{zone_name}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
+            df.to_csv(figdir / f'PiechartZone_{zone_name}_{groupby}_{jaar}.csv', header=False)
 
         plt.close()
 
-
     def plot_all(self):
         countingPoints = self.countingpoint_list()
-        nodes = self.network_nodes()['ID']
-        for c in countingPoints['Name']:
-            for y in self.traffic_scenarios.index:
-                self.plot_CountingPointsForYear(c, y)
+        zones = self.zone_list()['Name']
+        nodes = self.network_nodes().index
+        years = self.traffic_scenarios.index
+        #
+        # for c in countingPoints['Name']:
+        #     for y in self.traffic_scenarios.index:
+        #         self.plot_countingpoint_timeseries(c, y)
+        #
+        # for c in countingPoints['Name']:
+        #     for y in self.traffic_scenarios.index:
+        #         self.plot_countingpoint_piechart_CEMTclasses(c, y)
+        #
+        # for c in countingPoints['Name']:
+        #     self.plot_countingpoint_montlytimeseries_yearlychanges(c)
+        #
+        # for c in countingPoints['Name']:
+        #     self.plot_countingpoint_YearlyChangesCEMT(c)
+        #
+        # for y in years:
+        #     self.export_node_stats_shapefile(jaar=y)
+        #
+        # for z in zones:
+        #     for y in years:
+        #         self.plot_zone_timeseries(jaar=y, zone_name=z)
 
-        for c in countingPoints['Name']:
-            for y in self.traffic_scenarios.index:
-                self.plot_CEMTclassesForYear(c, y)
+        for z in zones:
+            for y in years:
+                self.plot_nodezone_piechart(groupby='NSTR', jaar=y, zone_name=z)
+                self.plot_nodezone_piechart(groupby='ship_types', jaar=y, zone_name=z)
+        #
+        # for n in nodes:
+        #     for y in years:
+        #         self.plot_node_timeseries(jaar=y, NodeID=n)
+        #
+        # for n in nodes:
+        #     for y in years:
+        #         self.plot_nodezone_piechart(groupby='NSTR', jaar=y, NodeID=n)
+        #         self.plot_nodezone_piechart(groupby='ship_types', jaar=y, NodeID=n)
+        #
 
-        for c in countingPoints['Name']:
-            self.plot_YearlyChanges_Timeseries(c)
-
-        for c in countingPoints['Name']:
-            self.plot_YearlyChangesCEMT(c)
-
-        for n in nodes:
-            for y in self.traffic_scenarios.index:
-                self.plot_timeseries_node(jaar=y, NodeID=n)
-
-        for n in nodes:
-            for y in self.traffic_scenarios.index:
-                self.plot_piechart_node(groupby='NSTR', jaar=y, NodeID=n)
-                self.plot_piechart_node(groupby='ship_types', jaar=y, NodeID=n)
 
