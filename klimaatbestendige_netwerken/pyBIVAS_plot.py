@@ -802,6 +802,7 @@ class IVS90_analyse(pyBIVAS_plot):
             plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
             df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.csv', header=False)
         else:
+            zone_name = zone_name.replace('/', '-')
             plt.savefig(figdir / f'PiechartZone_{zone_name}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
             df.to_csv(figdir / f'PiechartZone_{zone_name}_{groupby}_{jaar}.csv', header=False)
 
