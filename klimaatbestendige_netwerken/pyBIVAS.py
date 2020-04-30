@@ -297,6 +297,11 @@ class pyBIVAS:
                 sql_groupby += 'NstrGoodsClassification, '
                 sql_leftjoin += 'LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode '
 
+            if 'NST2007' in group_by:
+                sql_select += 'nst2007_mapping.Id || "] " || nst2007_mapping.GroupCode || " - " || nst2007_mapping.Description AS "NST2007",'
+                sql_groupby += 'Nst2007GoodsClassification, '
+                sql_leftjoin += 'LEFT JOIN nst2007_mapping ON trips.Nst2007GoodsClassification = nst2007_mapping.Id '
+
             if 'Vorm' in group_by:
                 sql_select += 'appearance_types.Description AS "Vorm",'
                 sql_groupby += 'trips.AppearanceTypeID, '
