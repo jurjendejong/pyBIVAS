@@ -174,11 +174,8 @@ class CreateWaterScenario:
             # Find current reach
             ii_start = self.nearest_df_row(df_depth, section['point_start'])
             ii_end = self.nearest_df_row(df_depth, section['point_end'])
-            reach = df_depth.loc[ii_start: ii_end]
+            reach = df_depth.loc[ii_start: ii_end].copy()
 
-            # Get stats
-            min_depth = reach['depth'].min()
-            min_width = reach['width'].min()
 
             # Get list of BIVAS arcs that need to be updated
             BIVAS_node_start = self.nearest_df_row(self.BIVAS_nodes, section['point_start'])
@@ -187,7 +184,25 @@ class CreateWaterScenario:
             _, bivas_arcs = self.shortestpath(self.BIVAS_networkx, BIVAS_node_start, BIVAS_node_end,
                                               weight_col='Length__m', edge_name='ID')
 
+            # First link all grid results to the nearest arc (based on centerpoint of arc)
+            BIVAS_arcs_centroid = self.BIVAS_arcs.loc[bivas_arcs].copy()
+            BIVAS_arcs_centroid['geometry'] = self.BIVAS_arcs.centroid
+
+            for row in reach.itertuples():
+                arc_id = self.nearest_df_row(BIVAS_arcs_centroid, row.geometry)
+                reach.loc[row.Index, 'nearest_arc'] = arc_id
+
+            # Second, loop through all arcs to find lowest depth (or closest depth)
             for arc in bivas_arcs:
+                logging.info(f'  {arc}')
+                if arc in reach.nearest_arc.values:
+                    min_depth = reach[reach.nearest_arc == arc]['depth'].min()
+                    min_width = reach[reach.nearest_arc == arc]['width'].min()
+                else:
+                    nearest_row = self.nearest_df_row(reach, self.BIVAS_arcs.loc[arc, 'geometry'])
+                    min_depth = reach.loc[nearest_row]['depth']
+                    min_width = reach.loc[nearest_row]['width']
+
                 self.waterscenario.loc[arc, 'WaterDepth__m'] = min_depth
 
                 # Add some extra columns for convenvenience. Should not be loaded to BIVAS
