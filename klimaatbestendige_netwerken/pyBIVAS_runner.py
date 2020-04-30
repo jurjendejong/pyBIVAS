@@ -179,7 +179,11 @@ class BIVAS_runner():
         headers = {'Accept': 'application/xml'}
         d = None
         while not d:
-            d = requests.get(url, data=data, headers=headers, verify=False)
+            try:
+                d = requests.get(url, data=data, headers=headers, verify=False)
+            except ConnectionError as error:
+                logger.warning(f'Failed to connect: {error}')
+
             logger.info('{}: Waiting for BIVAS to finish...'.format(datetime.now()))
             time.sleep(60)
 
