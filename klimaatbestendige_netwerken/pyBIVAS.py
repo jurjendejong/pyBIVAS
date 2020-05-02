@@ -356,7 +356,7 @@ class pyBIVAS:
         FROM route_statistics_{self.scenarioID} AS route_statistics
         LEFT JOIN trips_{self.scenarioID} AS trips ON route_statistics.TripID = trips.ID
         {sql_leftjoin}
-        WHERE {sql_where}
+        WHERE {sql_where} AND trips.NumberOfTrips = 0
         GROUP BY {sql_groupby}
         """
 
@@ -507,6 +507,7 @@ class pyBIVAS:
         LEFT JOIN trips_{0} AS trips ON infeasible_trips.TripID = trips.ID
         LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
+        WHERE infeasible_trips.NumberOfTrips = 0
         """.format(self.scenarioID)
 
         df = self.sql(sql)
@@ -584,7 +585,7 @@ class pyBIVAS:
             LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
             LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
             LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
-            WHERE ArcID = {arcID}
+            WHERE ArcID = {arcID} AND trips.NumberOfTrips = 0
             GROUP BY {group_by}
             """
         else:
@@ -630,7 +631,7 @@ class pyBIVAS:
         FROM routes_{self.scenarioID} AS routes
         LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
         LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
-        WHERE ArcID = {arcID}
+        WHERE ArcID = {arcID} AND trips.NumberOfTrips = 0
         """
 
         df = self.sql(sql)
@@ -781,6 +782,7 @@ class pyBIVAS:
                      LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
                      WHERE TrafficScenarioID={trafficScenarioId}
                          AND {d}TripEndPointNodeID={NodeID}
+                         AND trips.NumberOfTrips = 0
                      GROUP BY {groupby_field}
                      ORDER BY {groupby_sort}
                      """
@@ -973,6 +975,7 @@ class pyBIVAS:
                     AND zones.ZoneDefinitionID={zone_definition_id}
                     AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
                     AND zones.Name = "{zone_name}"
+                    AND trips.NumberOfTrips = 0
                     GROUP BY "Days"
             """
             df = self.sql(sql)
@@ -1028,6 +1031,7 @@ class pyBIVAS:
                      AND zones.ZoneDefinitionID={zone_definition_id}
                      AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
                      AND zones.Name = "{zone_name}"
+                     AND trips.NumberOfTrips = 0
                      GROUP BY {groupby_field}
                      ORDER BY {groupby_sort}
                      """
@@ -1084,6 +1088,7 @@ class pyBIVAS:
         WHERE ReferenceSetID = {referenceSetId}
         AND counting_points.Name = "{countingPointName}"
         AND trips.TrafficScenarioID = {trafficScenarioId}
+        AND trips.NumberOfTrips = 0
         GROUP BY {groupby}
         """
         df = self.sql(sql)
@@ -1119,6 +1124,7 @@ class pyBIVAS:
         WHERE ReferenceSetID = {}
         AND counting_points.Name = "{}"
         AND trips.TrafficScenarioID = {}
+        AND trips.NumberOfTrips = 0
         GROUP BY CEMT_klasse
         ORDER BY cemt_class.ID
         """.format(referenceSetId, countingPointName, trafficScenarioId)
