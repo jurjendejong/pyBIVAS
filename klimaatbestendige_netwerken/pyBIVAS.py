@@ -272,14 +272,16 @@ class pyBIVAS:
         - Vorm: Classification of appearance type
         - Origin_Node: Group by node of origin port
         - Destination_Node: Group by node of destination port
-        - Origin_NUTS3: Group by NUTS3 area of origins
-        - Destination_NUTS3: Group by NUTS3 area of destinations
+        - Origin_Zone: Group by Zone area of origins
+        - Destination_Zone: Group by Zone area of destinations
         """
 
         sql_select = ''
         sql_groupby = ''
         sql_leftjoin = ''
         sql_where = ''
+
+        include_all_columns = False
 
         if not group_by:
             sql_groupby = 'Null'
@@ -288,55 +290,62 @@ class pyBIVAS:
                 sql_select += 'trips.ID AS "TripsID",'
                 sql_groupby += 'trips.ID, '
 
-            if 'Days' in group_by:
+                include_all_columns = True
+
+            if 'Days' in group_by or include_all_columns:
                 sql_select += 'DATE(trips.DateTime) AS "Days",'
                 sql_groupby += 'Days, '
 
-            if 'NSTR' in group_by:
+            if 'NSTR' in group_by or include_all_columns:
                 sql_select += 'nstr_mapping.GroupCode AS "NSTR",'
                 sql_groupby += 'NstrGoodsClassification, '
                 sql_leftjoin += 'LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode '
 
-            if 'NST2007' in group_by:
+            if 'NST2007' in group_by or include_all_columns:
                 sql_select += 'nst2007_mapping.Id || "] " || nst2007_mapping.GroupCode || " - " || nst2007_mapping.Description AS "NST2007",'
                 sql_groupby += 'Nst2007GoodsClassification, '
                 sql_leftjoin += 'LEFT JOIN nst2007_mapping ON trips.Nst2007GoodsClassification = nst2007_mapping.Id '
 
-            if 'Vorm' in group_by:
+            if 'Vorm' in group_by or include_all_columns:
                 sql_select += 'appearance_types.Description AS "Vorm",'
                 sql_groupby += 'trips.AppearanceTypeID, '
                 sql_leftjoin += 'LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID '
 
-            if 'Origin_Node' in group_by:
+            if 'Origin_Node' in group_by or include_all_columns:
                 sql_select += 'trips.OriginTripEndPointNodeID AS "Origin_Node",'
                 sql_select += 'nodes_origin.XCoordinate AS "Origin_X",'
                 sql_select += 'nodes_origin.YCoordinate AS "Origin_Y",'
                 sql_groupby += 'trips.OriginTripEndPointNodeID, '
                 sql_leftjoin += 'LEFT JOIN nodes AS nodes_origin ON trips.OriginTripEndPointNodeID = nodes_origin.ID '
 
-            if 'Destination_Node' in group_by:
+            if 'Destination_Node' in group_by or include_all_columns:
                 sql_select += 'trips.DestinationTripEndPointNodeID AS "Destination_Node",'
                 sql_select += 'nodes_destination.XCoordinate AS "Destination_X",'
                 sql_select += 'nodes_destination.YCoordinate AS "Destination_Y",'
                 sql_groupby += 'trips.DestinationTripEndPointNodeID, '
                 sql_leftjoin += 'LEFT JOIN nodes AS nodes_destination ON trips.DestinationTripEndPointNodeID = nodes_destination.ID '
 
-            if 'Origin_NUTS3' in group_by:
-                sql_leftjoin += 'LEFT JOIN zone_node_mapping ON trips.OriginTripEndPointNodeID = zone_node_mapping.NodeID '
-                sql_leftjoin += 'LEFT JOIN zones ON zone_node_mapping.ZoneID = zones.ID '
-                sql_groupby += 'zones.ID, '
-                sql_select += 'zones.Name AS Origin_NUTS3, '
-                sql_where += ' zones.ZoneDefinitionID = 7 AND zone_node_mapping.ZoneDefinitionID = 7 AND '
+            if 'Origin_Zone' in group_by or include_all_columns:
+                zone_definition_id = 9
+                sql_leftjoin += 'LEFT JOIN zone_node_mapping AS znm_Origin ON trips.OriginTripEndPointNodeID = znm_Origin.NodeID '
+                sql_leftjoin += 'LEFT JOIN zones AS zones_origin ON znm_Origin.ZoneID = zones_origin.ID '
+                sql_groupby += 'zones_origin.ID, '
+                sql_select += 'zones_origin.Name AS Origin_Zone, '
+                sql_where += f' zones_origin.ZoneDefinitionID = {zone_definition_id} AND znm_Origin.ZoneDefinitionID = {zone_definition_id} AND '
 
-            if 'Destination_NUTS3' in group_by:
-                sql_leftjoin += 'LEFT JOIN zone_node_mapping ON trips.DestinationTripEndPointNodeID = zone_node_mapping.NodeID '
-                sql_leftjoin += 'LEFT JOIN zones ON zone_node_mapping.ZoneID = zones.ID '
-                sql_groupby += 'zones.ID, '
-                sql_select += 'zones.Name AS Destination_NUTS3, '
-                sql_where += ' zones.ZoneDefinitionID = 7 AND zone_node_mapping.ZoneDefinitionID = 7 AND '
+            if 'Destination_Zone' in group_by or include_all_columns:
+                zone_definition_id = 9
+                sql_leftjoin += 'LEFT JOIN zone_node_mapping AS znm_Destination ON trips.DestinationTripEndPointNodeID = znm_Destination.NodeID '
+                sql_leftjoin += 'LEFT JOIN zones AS zones_destination ON znm_Destination.ZoneID = zones_destination.ID '
+                sql_groupby += 'zones_destination.ID, '
+                sql_select += 'zones_destination.Name AS Destination_Zone, '
+                sql_where += f' zones_destination.ZoneDefinitionID = {zone_definition_id} AND znm_Destination.ZoneDefinitionID = {zone_definition_id} AND '
 
             sql_groupby = sql_groupby[:-2]
             sql_where = sql_where[:-5]
+
+            if include_all_columns:
+                sql_groupby = 'Trips.ID'
 
         if not sql_where:
             sql_where = '1'
@@ -355,12 +364,6 @@ class pyBIVAS:
 
         # Use short strings for NSTR classes
         df = df.replace({'NSTR': self.NSTR_shortnames})
-
-        if group_by and 'Origin_NUTS3' in group_by:
-            df['Afkorting'] = df['Origin_NUTS3'].str.split(pat=' - ', expand=True)[0]
-
-        if group_by and 'Destination_NUTS3' in group_by:
-            df['Afkorting'] = df['Destination_NUTS3'].str.split(pat=' - ', expand=True)[0]
 
         # Format dates
         if group_by and 'Days' in group_by:
@@ -567,6 +570,7 @@ class pyBIVAS:
                    cemt_class.Description AS cemt_class_Description,
                    nstr_mapping.GroupCode AS NSTR,
                    nstr_mapping.Description AS nstr_Description,
+                   nst2007_mapping.*,
                    appearance_types.Description AS appearance_types_Description,
                    dangerous_goods_levels.Description AS dangerous_goods_levels_Description,
                    {self.compute_route_statistics}
@@ -574,6 +578,7 @@ class pyBIVAS:
             LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
             LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
             LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
+            LEFT JOIN nst2007_mapping ON trips.Nst2007GoodsClassification = nst2007_mapping.Id
             LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
             LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
             LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
@@ -595,6 +600,13 @@ class pyBIVAS:
 
         df = df.replace({'NSTR': self.NSTR_shortnames})
         df = df.replace({'appearance_types_Description': self.appeareance_rename})
+
+        # Extra kolommen:
+        df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
+        C_w = 0.9 # could also be received from database, but it's constant anyway
+        df['TPMCI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
+        df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPMCI']*100)
+        df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPMCI']*100)
 
         if group_by == 'trips.ID':
             df = df.set_index('ID')
@@ -854,7 +866,7 @@ class pyBIVAS:
     """
 
     def network_arcs(self, outputfileshape=None, outputfilecsv=None):
-        """Export all Arcs in BIVAS to shapefile"""
+        """Export all Arcs in BIVAS to geojsonfile"""
 
         sql = """
         SELECT arcs.*,
@@ -889,13 +901,13 @@ class pyBIVAS:
         arcsgpd = geopandas.GeoDataFrame(arcs)
 
         if outputfileshape:
-            arcsgpd.reset_index().to_file(outputfileshape)
+            arcsgpd.reset_index().to_file(outputfileshape, driver='GeoJSON')
 
         self.arcs = arcsgpd
         return self.arcs
 
     def network_nodes(self, outputfile=None):
-        """Export all Nodes in BIVAS to shapefile"""
+        """Export all Nodes in BIVAS to geojsonfile"""
 
         sql = """
         SELECT *
@@ -907,7 +919,7 @@ class pyBIVAS:
 
         nodes = geopandas.GeoDataFrame(nodes)
         if outputfile:
-            nodes.to_file(outputfile)
+            nodes.to_file(outputfile, driver='GeoJSON')
 
         self.nodes = nodes
         return self.nodes
@@ -925,6 +937,21 @@ class pyBIVAS:
         """
         zones = self.sql(sql)
         return zones
+
+    def zone_node_mapping(self,  zone_definition='BasGoed 2018'):
+        sql = f"""SELECT ID FROM zone_definitions WHERE Name = "{zone_definition}" """
+        zone_definition_id = self.sql(sql).iloc[0, 0]
+
+        sql = f"""
+        SELECT zone_node_mapping.NodeID, zone_node_mapping.ZoneID, zones.Name
+        FROM zone_node_mapping
+        LEFT JOIN zones ON zone_node_mapping.ZoneID = zones.ID
+        LEFT JOIN zone_definitions ON zone_definitions.ID = zone_node_mapping.ZoneID
+        WHERE     zones.ZoneDefinitionID={zone_definition_id}
+              AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
+        """
+        zone_node_mapping = self.sql(sql)
+        return zone_node_mapping
 
     def zone_timeseries(self, zone_name, trafficScenarioId, zone_definition='BasGoed 2018'):
 
