@@ -426,7 +426,17 @@ class pyBIVAS_plot(pyBIVAS):
         for label, arcID in self.Arcs.items():
             self.plot_Vlootopbouw(arcID, label)
 
-    def plot_Vlootopbouw(self, arcID, label):
+    def plot_Vlootopbouw(self, arcID, label, userealtrips=True):
+        """
+
+
+
+        :param arcID:
+        :param label:
+        :param userealtrips: Either use the number of tracks in the database (so real trips) or the NumberOfTrips of the BIVAS result
+        :return:
+        """
+
         figdir = self.outputdir / 'figures_Vlootopbouw'
         if not figdir.exists():
             figdir.mkdir()
@@ -436,9 +446,15 @@ class pyBIVAS_plot(pyBIVAS):
 
         ordered_ship_types, data_merge_small_ships = self.remove_small_ships(df)
         appearanceTypesOrder = self.appearancetypes()['Description'][::-1]
-        data = data_merge_small_ships.groupby(['ship_types_Label', 'appearance_types_Description']
-                                              ).count()['Depth__m'].unstack().loc[
-            ordered_ship_types, appearanceTypesOrder].fillna(0)  # TODO: Change .loc[] to .reindex()
+        if userealtrips:
+            data = data_merge_small_ships.groupby(['ship_types_Label', 'appearance_types_Description']
+                                                  ).count()['Depth__m'].unstack().loc[
+                ordered_ship_types, appearanceTypesOrder].fillna(0)  # TODO: Change .loc[] to .reindex()
+
+        else:
+            data = data_merge_small_ships.groupby(['ship_types_Label', 'appearance_types_Description']
+                                                  ).sum()["Aantal Vaarbewegingen (-)"].unstack().loc[
+                ordered_ship_types, appearanceTypesOrder].fillna(0)  # TODO: Change .loc[] to .reindex()
         data.plot.bar(stacked=True, width=0.9, zorder=3, figsize=(8, 6), color=['C0', 'C1', 'C2', '#555555'])
         plt.gca().legend(*map(reversed, plt.gca().get_legend_handles_labels()), loc='center left',
                          bbox_to_anchor=(1, 0.5))
