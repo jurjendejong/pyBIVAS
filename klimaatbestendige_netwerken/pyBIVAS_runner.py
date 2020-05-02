@@ -124,7 +124,7 @@ class BIVAS_runner():
 
         # Set scenario name and description
         date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficScenario},'
+        self.description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficScenario},'
 
         sql = """
         UPDATE scenarios
@@ -132,7 +132,7 @@ class BIVAS_runner():
             Description = "{}"
         WHERE ID = {}
         """.format(
-            self.scenarioName, description, self.scenarioID)
+            self.scenarioName, self.description, self.scenarioID)
         c.execute(sql)
 
         # Update traffic Scenario. I'm simply updating all scenarios
@@ -195,6 +195,20 @@ class BIVAS_runner():
         logger.info('Closing BIVAS')
         os.system('taskkill /f /im Bivas.exe')
         time.sleep(5)
+
+    def store(self, storage_dir, logfile=None):
+        storage_dir = Path(storage_dir)
+        date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        storage_file = storage_dir / f'Bivas_{self.scenarioName}.db'
+        if storage_file.exists():
+            storage_file = storage_dir / f'Bivas_{self.scenarioName}_{date_string}.db'
+
+        shutil.copyfile(self.BIVAS_database, storage_file)
+
+        if logfile is not None:
+            with open(storage_dir / logfile, 'a') as log:
+                log.write(f'{date_string}\t{storage_file.name}\t{self.description}')
 
 
 # class BIVAS_API:
