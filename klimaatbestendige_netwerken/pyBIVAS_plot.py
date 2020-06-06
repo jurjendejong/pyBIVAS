@@ -24,19 +24,21 @@ class pyBIVAS_plot(pyBIVAS):
     Append the class pyBIVAS with plotting functions
     """
 
-    # Arcs in BIVAS 4.4
+    # Arcs in BIVAS
     Arcs = {
         'BovenRijn': 9204,
         'Waal': 6332,
         'Pannerdensch Kanaal': 8886,
         'Nederrijn': 6645,
+        'Lek': 6717,
         'IJssel': 6510,
         'Zuid-Willemsvaart': 9130,
         'Zandmaas': 7523,
         'Julianakanaal': 8710,
         'Schelde-Rijnkanaal': 8387,
         'Betuwepand (ARK)': 6853,
-        'Amsterdam-Rijnkanaal': 6472,
+        'Amsterdam-Rijnkanaal': 1645,
+        'Merwedekanaal': 6330,
         'Delftse Schie': 6572,
         'Oude Maas': 7121,
         'Nieuwe Maas': 6746,
@@ -144,8 +146,8 @@ class pyBIVAS_plot(pyBIVAS):
 
         plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.png',
                     dpi=300, bbox_inches='tight')
-        plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.svg',
-                    dpi=300, bbox_inches='tight')
+        # plt.savefig(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.svg',
+        #             dpi=300, bbox_inches='tight')
         tp.to_csv(figdir / f'Hist_{label}_Diepgang_{figtype1}_per_{figtype2}.csv')
 
         plt.close()
@@ -248,6 +250,7 @@ class pyBIVAS_plot(pyBIVAS):
         plt.xlim(0, 2.5)
         plt.savefig(figdir / 'Aandeel totale kosten per vaarweg', kind='png', dpi=300, bbox_inches='tight')
         dfArcs["Totale Vaarkosten (EUR)"].transpose().to_csv(figdir / 'Aandeel totale kosten per vaarweg.csv')
+        plt.close()
 
         # Plot vracht
         (dfArcs["Totale Vracht (ton)"] / 1e6).transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
@@ -260,6 +263,7 @@ class pyBIVAS_plot(pyBIVAS):
         plt.axhline(len(self.Arcs) - 0.5, c='k', ls='--')
         plt.savefig(figdir / 'Aandeel vracht per vaarweg', kind='png', dpi=300, bbox_inches='tight')
         dfArcs["Totale Vracht (ton)"].transpose().to_csv(figdir / 'Aandeel vracht per vaarweg.csv')
+        plt.close()
 
         # Plot aantal vaarbeweingen
         dfArcs["Aantal Vaarbewegingen (-)"].transpose().plot(kind='barh', stacked=True, figsize=(14, 8), zorder=3,
@@ -272,6 +276,7 @@ class pyBIVAS_plot(pyBIVAS):
         plt.axhline(len(self.Arcs) - 0.5, c='k', ls='--')
         plt.savefig(figdir / 'Aantal vaarbewegingen per vaarweg', kind='png', dpi=300, bbox_inches='tight')
         dfArcs["Aantal Vaarbewegingen (-)"].transpose().to_csv(figdir / 'Aantal vaarbewegingen per vaarweg.csv')
+        plt.close()
 
     def plot_vergelijking_trafficScenarios(self, trafficScenarios: list):
         figdir = self.outputdir / 'figures_Vergelijking_TrafficScenarios'
@@ -308,6 +313,7 @@ class pyBIVAS_plot(pyBIVAS):
         plt.ylabel('Vaarbewegingen (-)')
         plt.savefig(figdir / 'ToenameVaarbewegingen.png', dpi=150, bbox_inches='tight')
         df_pivot.to_csv(figdir / 'ToenameVaarbewegingen.csv')
+        plt.close()
 
         ## Vracht
 
@@ -323,6 +329,7 @@ class pyBIVAS_plot(pyBIVAS):
         plt.ylabel('Vracht (miljoen ton)')
         plt.savefig(figdir / 'ToenameVracht.png', dpi=150, bbox_inches='tight')
         df_pivot.to_csv(figdir / 'ToenameVracht.csv')
+        plt.close()
 
     def plot_Beladingsgraad_all(self, **kwargs):
         for label, arcID in self.Arcs.items():
@@ -371,7 +378,7 @@ class pyBIVAS_plot(pyBIVAS):
                      )
 
         plt.savefig(figdir / f'Beladingsgraad_{label}.png', dpi=300, bbox_inches='tight')
-        plt.savefig(figdir / f'Beladingsgraad_{label}.svg', bbox_inches='tight')
+        # plt.savefig(figdir / f'Beladingsgraad_{label}.svg', bbox_inches='tight')
         plt.close()
 
     def plot_tijdseries_vloot(self, arcID, label, time_start='2018-03', time_end='2018-06'):
