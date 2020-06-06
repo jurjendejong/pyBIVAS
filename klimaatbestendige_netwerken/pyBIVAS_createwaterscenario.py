@@ -164,12 +164,13 @@ class CreateWaterScenario:
         # Project results on the grid
         for label, section in sections.items():
             logging.info(f'  {label}')
-            # logging.info(f'  {section}')
             df_depth = self.datagrids[section['grid']].compute_depth_forwidth(
                 channelwidth=section['channel_width'],
                 min_channelwidth=section['min_channel_width'],
                 min_channel_depth=section['min_channel_depth']
             )
+
+            # df_depth.reset_index().to_file(f'waterdieptegrid_{label}.shp')
 
             # Find current reach
             ii_start = self.nearest_df_row(df_depth, section['point_start'])
@@ -194,14 +195,20 @@ class CreateWaterScenario:
 
             # Second, loop through all arcs to find lowest depth (or closest depth)
             for arc in bivas_arcs:
-                logging.info(f'  {arc}')
+                logging.debug(f'  {arc}')
                 if arc in reach.nearest_arc.values:
                     min_depth = reach[reach.nearest_arc == arc]['depth'].min()
                     min_width = reach[reach.nearest_arc == arc]['width'].min()
+
+                    reach_depth_nrow = reach[reach.nearest_arc == arc]['depth'].argmin()
+                    reach_width_nrow = reach[reach.nearest_arc == arc]['width'].argmin()
                 else:
                     nearest_row = self.nearest_df_row(reach, self.BIVAS_arcs.loc[arc, 'geometry'])
                     min_depth = reach.loc[nearest_row]['depth']
                     min_width = reach.loc[nearest_row]['width']
+
+                    reach_depth_nrow = nearest_row
+                    reach_width_nrow = nearest_row
 
                 self.waterscenario.loc[arc, 'WaterDepth__m'] = min_depth
 
@@ -216,8 +223,15 @@ class CreateWaterScenario:
                             b=BIVAS_arc
                         )
 
-        return self.waterscenario
+                    self.waterscenario.loc[arc, 'nrow_depth'] = reach_depth_nrow
+                    self.waterscenario.loc[arc, 'nrow_width'] = reach_width_nrow
+                    self.waterscenario.loc[arc, 'mapping_to_grid'] = \
+                        'LINESTRING ({b.XM:.0f} {b.YM:.0f}, {g.x:.0f} {g.y:.0f})'.format(
+                            b=BIVAS_arc,
+                            g=reach.loc[reach_depth_nrow]['geometry']
+                        )
 
+        return self.waterscenario
 
     @staticmethod
     def networkx_from_sobek3(SOBEK_network_file, exclude_sobek_reaches_from_network=None):

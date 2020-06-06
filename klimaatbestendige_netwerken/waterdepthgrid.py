@@ -140,7 +140,7 @@ class WaterdepthGrid:
 
             # Compute depth_width_relation
             max_depth = np.max(Z)
-            stepsize = 0.1
+            stepsize = 0.01
             min_depth = 0
 
             depths = np.arange(min_depth, max_depth, stepsize)[1:-1]  # skip first element (crash in interp)
