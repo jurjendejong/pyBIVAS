@@ -80,6 +80,9 @@ class pyBIVAS:
         if databasefile:
             self.connectToSQLiteDatabase(databasefile)
 
+    def __repr__(self):
+        return f'pyBIVAS connection to: {self.databasefile}'
+
     def connectToMySQLDatabase(self, host='localhost', user='root', password='', db='bivas'):
         """
         Connect to MySQL database
@@ -356,7 +359,7 @@ class pyBIVAS:
         FROM route_statistics_{self.scenarioID} AS route_statistics
         LEFT JOIN trips_{self.scenarioID} AS trips ON route_statistics.TripID = trips.ID
         {sql_leftjoin}
-        WHERE {sql_where} AND trips.NumberOfTrips = 0
+        WHERE {sql_where} AND trips.NumberOfTrips > 0
         GROUP BY {sql_groupby}
         """
 
@@ -507,7 +510,7 @@ class pyBIVAS:
         LEFT JOIN trips_{0} AS trips ON infeasible_trips.TripID = trips.ID
         LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
-        WHERE infeasible_trips.NumberOfTrips = 0
+        WHERE infeasible_trips.NumberOfTrips > 0
         """.format(self.scenarioID)
 
         df = self.sql(sql)
@@ -585,7 +588,7 @@ class pyBIVAS:
             LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
             LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
             LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
-            WHERE ArcID = {arcID} AND trips.NumberOfTrips = 0
+            WHERE ArcID = {arcID} AND trips.NumberOfTrips > 0
             GROUP BY {group_by}
             """
         else:
@@ -631,7 +634,7 @@ class pyBIVAS:
         FROM routes_{self.scenarioID} AS routes
         LEFT JOIN trips_{self.scenarioID} AS trips ON routes.TripID = trips.ID
         LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
-        WHERE ArcID = {arcID} AND trips.NumberOfTrips = 0
+        WHERE ArcID = {arcID} AND trips.NumberOfTrips > 0
         """
 
         df = self.sql(sql)
@@ -643,7 +646,7 @@ class pyBIVAS:
         SELECT ArcID,
         SUM(arcStats.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
         SUM(arcStats.NumberOfTrips * arcStats.AverageLoadWeight__t) AS "Totale Vracht (ton)",
-        SUM(arcStats.AverageCosts__Eur / arcStats.AverageDistance__km) AS "Gemiddelde kosten/km"
+        SUM(arcStats.AverageCosts__Eur) / SUM(arcStats.AverageDistance__km) AS "Gemiddelde kosten/km"
         FROM arc_usage_statistics_details_{0} AS arcStats
         GROUP BY ArcID
         """.format(self.scenarioID)
@@ -782,7 +785,7 @@ class pyBIVAS:
                      LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID
                      WHERE TrafficScenarioID={trafficScenarioId}
                          AND {d}TripEndPointNodeID={NodeID}
-                         AND trips.NumberOfTrips = 0
+                         AND trips.NumberOfTrips > 0
                      GROUP BY {groupby_field}
                      ORDER BY {groupby_sort}
                      """
@@ -975,7 +978,7 @@ class pyBIVAS:
                     AND zones.ZoneDefinitionID={zone_definition_id}
                     AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
                     AND zones.Name = "{zone_name}"
-                    AND trips.NumberOfTrips = 0
+                    AND trips.NumberOfTrips > 0
                     GROUP BY "Days"
             """
             df = self.sql(sql)
@@ -1031,7 +1034,7 @@ class pyBIVAS:
                      AND zones.ZoneDefinitionID={zone_definition_id}
                      AND zone_node_mapping.ZoneDefinitionID={zone_definition_id}
                      AND zones.Name = "{zone_name}"
-                     AND trips.NumberOfTrips = 0
+                     AND trips.NumberOfTrips > 0
                      GROUP BY {groupby_field}
                      ORDER BY {groupby_sort}
                      """
@@ -1088,7 +1091,7 @@ class pyBIVAS:
         WHERE ReferenceSetID = {referenceSetId}
         AND counting_points.Name = "{countingPointName}"
         AND trips.TrafficScenarioID = {trafficScenarioId}
-        AND trips.NumberOfTrips = 0
+        AND trips.NumberOfTrips > 0
         GROUP BY {groupby}
         """
         df = self.sql(sql)
@@ -1124,7 +1127,7 @@ class pyBIVAS:
         WHERE ReferenceSetID = {}
         AND counting_points.Name = "{}"
         AND trips.TrafficScenarioID = {}
-        AND trips.NumberOfTrips = 0
+        AND trips.NumberOfTrips > 0
         GROUP BY CEMT_klasse
         ORDER BY cemt_class.ID
         """.format(referenceSetId, countingPointName, trafficScenarioId)
