@@ -164,19 +164,26 @@ class CreateWaterScenario:
         # Project results on the grid
         for label, section in sections.items():
             logging.info(f'  {label}')
-            df_depth = self.datagrids[section['grid']].compute_depth_forwidth(
-                channelwidth=section['channel_width'],
-                min_channelwidth=section['min_channel_width'],
-                min_channel_depth=section['min_channel_depth']
-            )
 
-            # df_depth.reset_index().to_file(f'waterdieptegrid_{label}.shp')
+            if 'sideslope' not in section:  # Old mode
+                df_depth = self.datagrids[section['grid']].compute_depth_forwidth(
+                    channelwidth=section['channel_width'],
+                    min_channelwidth=section['min_channel_width'],
+                    min_channel_depth=section['min_channel_depth']
+                )
+            else:
+                df_depth = self.datagrids[section['grid']].compute_depth_forwidth(
+                    channelwidth=section['channel_width'],
+                    depth_at_fullwidth=section['depth_at_fullwidth'],
+                    sideslope=section['sideslope']
+                )
 
             # Find current reach
             ii_start = self.nearest_df_row(df_depth, section['point_start'])
             ii_end = self.nearest_df_row(df_depth, section['point_end'])
             reach = df_depth.loc[ii_start: ii_end].copy()
 
+            reach.reset_index().to_file(f'waterdieptegrid_{label}.shp')
 
             # Get list of BIVAS arcs that need to be updated
             BIVAS_node_start = self.nearest_df_row(self.BIVAS_nodes, section['point_start'])
@@ -200,8 +207,8 @@ class CreateWaterScenario:
                     min_depth = reach[reach.nearest_arc == arc]['depth'].min()
                     min_width = reach[reach.nearest_arc == arc]['width'].min()
 
-                    reach_depth_nrow = reach[reach.nearest_arc == arc]['depth'].argmin()
-                    reach_width_nrow = reach[reach.nearest_arc == arc]['width'].argmin()
+                    reach_depth_nrow = reach[reach.nearest_arc == arc]['depth'].idxmin()
+                    reach_width_nrow = reach[reach.nearest_arc == arc]['width'].idxmin()
                 else:
                     nearest_row = self.nearest_df_row(reach, self.BIVAS_arcs.loc[arc, 'geometry'])
                     min_depth = reach.loc[nearest_row]['depth']

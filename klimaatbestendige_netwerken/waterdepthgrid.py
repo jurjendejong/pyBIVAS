@@ -10,7 +10,7 @@ import geopandas as gpd
 import logging
 from klimaatbestendige_netwerken.externals.dep import Dep
 from klimaatbestendige_netwerken.externals.grid import Grid
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
 import numpy as np
 
 logging.basicConfig(level=logging.INFO)
@@ -119,6 +119,7 @@ class WaterdepthGrid:
 
         :return:
         """
+        logging.info(f'Computing width-depth tables per n-row')
 
         all_n_rows = sorted(self.gpd['n'].unique())
 
@@ -157,7 +158,10 @@ class WaterdepthGrid:
                 'Centroid': gpd_row.geometry.unary_union.centroid
             }
 
-    def compute_depth_forwidth(self, channelwidth, min_channelwidth=0, min_channel_depth=0):
+    def compute_depth_forwidth(self, channelwidth,
+                               min_channelwidth=0, min_channel_depth=0,  # Old params
+                               sideslope=0, depth_at_fullwidth=0,  # New params
+                               ):
         """
 
         :param channelwidth: Base width
@@ -165,21 +169,39 @@ class WaterdepthGrid:
         :param min_channel_depth: Only do narrowing if width gets lower than this depth
         :return:
         """
+        logging.info(f'Computing depth per n-row')
 
         channel_depth = {}
         channel_width = {}
         for n_row, ZW_table in self.ZW_table.items():
-            depth_fullwidth = np.interp(channelwidth, ZW_table['W'][::-1], ZW_table['Z'][::-1])
-            if depth_fullwidth > min_channel_depth:
-                width_n = channelwidth
-                depth_n = depth_fullwidth
-            else:
-                width_n = np.interp(min_channel_depth, ZW_table['Z'], ZW_table['W'])
-                depth_n = min_channel_depth
 
-                if width_n < min_channelwidth:
-                    width_n = min_channelwidth
-                    depth_n = np.interp(min_channelwidth, ZW_table['W'][::-1], ZW_table['Z'][::-1])
+            if sideslope == 0: # Old mode
+                depth_fullwidth = np.interp(channelwidth, ZW_table['W'][::-1], ZW_table['Z'][::-1])
+                if depth_fullwidth > min_channel_depth:
+                    width_n = channelwidth
+                    depth_n = depth_fullwidth
+                else:
+                    width_n = np.interp(min_channel_depth, ZW_table['Z'], ZW_table['W'])
+                    depth_n = min_channel_depth
+
+                    if width_n < min_channelwidth:
+                        width_n = min_channelwidth
+                        depth_n = np.interp(min_channelwidth, ZW_table['W'][::-1], ZW_table['Z'][::-1])
+            else:  # New mode
+
+                # Construct curve that illustrates the desired depth-width ratio
+                D_lowest = depth_at_fullwidth - (channelwidth - 0) / 2 * (1 / sideslope)
+
+                Lookupcurve_x = [D_lowest, channelwidth, channelwidth]
+                Lookupcurve_y = [0, depth_at_fullwidth, 99]
+
+                # Find where on this line this map is
+                first_line = LineString(np.column_stack((ZW_table['W'], ZW_table['Z'])))
+                second_line = LineString(np.column_stack((Lookupcurve_x, Lookupcurve_y)))
+                intersection = first_line.intersection(second_line)
+
+                width_n = intersection.x
+                depth_n = intersection.y
 
             channel_depth[n_row] = depth_n
             channel_width[n_row] = width_n
@@ -190,11 +212,12 @@ class WaterdepthGrid:
             'geometry': {n_row: ZW_table['Centroid'] for n_row, ZW_table in self.ZW_table.items()}
         })
 
+
     def export_shapefile(self, filepath):
         self.gpd.to_file(filepath)
 
     def __repr__(self):
-        return f'WaterdepthGrid {self.grid.shape}'
+        return f'WaterdepthGrid. Shape: {self.grid.shape}'
 
     ##################
     # STATIC METHODS #
