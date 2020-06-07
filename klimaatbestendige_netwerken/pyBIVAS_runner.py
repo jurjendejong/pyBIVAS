@@ -49,7 +49,7 @@ class BIVAS_runner():
             shutil.copyfile(BIVAS_database_file, self.BIVAS_installation_dir / 'Bivas.db')
         assert self.BIVAS_database.exists(), 'BIVAS database not found'
 
-    def prepare_database(self, waterscenario=None, trafficScenario=None):
+    def prepare_database(self, waterscenario=None, trafficscenario=None):
         """
         This function copys the reference databasefile to the rundir
         It updates the database with the new waterscenario
@@ -124,7 +124,7 @@ class BIVAS_runner():
 
         # Set scenario name and description
         date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficScenario},'
+        self.description = f'Date: {date_string}, Waterscenario: {waterscenario}, TrafficScenario: {trafficscenario},'
 
         sql = """
         UPDATE scenarios
@@ -137,12 +137,12 @@ class BIVAS_runner():
 
         # Update traffic Scenario. I'm simply updating all scenarios
         # Otherwise I should check the BranchSet structure
-        if trafficScenario:
-            if isinstance(trafficScenario, int):
-                sql = """UPDATE parameters SET TrafficScenarioID = "{}" WHERE 1""".format(trafficScenario)
+        if trafficscenario:
+            if isinstance(trafficscenario, int):
+                sql = """UPDATE parameters SET TrafficScenarioID = "{}" WHERE 1""".format(trafficscenario)
                 c.execute(sql)
             else:
-                trafficScenarioID = df_trafficscenarios.index[df_trafficscenarios['Description'] == trafficScenario][0]
+                trafficScenarioID = df_trafficscenarios.index[df_trafficscenarios['Description'] == trafficscenario][0]
                 sql = """UPDATE parameters SET TrafficScenarioID = "{}" WHERE 1""".format(trafficScenarioID)
                 c.execute(sql)
 
