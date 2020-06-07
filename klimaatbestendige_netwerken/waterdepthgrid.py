@@ -189,7 +189,8 @@ class WaterdepthGrid:
                         depth_n = np.interp(min_channelwidth, ZW_table['W'][::-1], ZW_table['Z'][::-1])
             else:  # New mode
 
-                # Construct curve that illustrates the desired depth-width ratio
+                # Construct curve that illustrates the desired depth-width ratio. First compute the depth based on the
+                # sideslode when the width converges to 0
                 D_lowest = depth_at_fullwidth - (channelwidth - 0) / 2 * (1 / sideslope)
 
                 Lookupcurve_x = [D_lowest, channelwidth, channelwidth]
