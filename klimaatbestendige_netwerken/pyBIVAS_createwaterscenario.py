@@ -159,7 +159,14 @@ class CreateWaterScenario:
 
         self.datagrids = datagrids
 
-    def waterdepth_from_grids(self, sections, add_extra_columns=True):
+    def waterdepth_from_grids(self, sections, add_extra_columns=True, manual_points=None):
+        """
+
+        :param sections: dict with structure {branchname: {point_start, point_end, channel_width, depth_at_fullwidth, sideslope, grid}}
+        :param add_extra_columns: Boleaan. Add additional columns to waterscenario file
+        :param manual_points: dict for adding manual points: {name: {BIVAS_arc, SOBEK_grid, bedlevel}
+        :return:
+        """
         logging.info('Getting waterdepth from grids')
         # Project results on the grid
         for label, section in sections.items():
@@ -238,6 +245,25 @@ class CreateWaterScenario:
                             g=reach.loc[reach_depth_nrow]['geometry']
                         )
 
+        if manual_points is not None:
+            for name, params in manual_points.items():
+                arc = params['BIVAS_arc']
+
+                waterlevel = self.gridpoint_stats.loc[params['SOBEK_grid'], ('water_level', 'max')]
+                waterdepth = waterlevel - params['bedlevel']
+
+                BIVAS_arc = self.BIVAS_arcs.loc[arc]
+                self.waterscenario.loc[arc, 'SeasonID'] = 1
+                self.waterscenario.loc[arc, 'WaterDepth__m'] = waterdepth
+                self.waterscenario.loc[arc, 'WaterLevel__m'] = waterlevel
+                self.waterscenario.loc[arc, 'WaterSpeed__m_s'] = 0.0
+                self.waterscenario.loc[arc, 'RateOfFlow__m3_s'] = 0.0
+
+                self.waterscenario.loc[arc, 'geometry'] = \
+                    'LINESTRING ({b.X1:.0f} {b.Y1:.0f}, {b.X2:.0f} {b.Y2:.0f})'.format(
+                        b=BIVAS_arc
+                    )
+            self.waterscenario['SeasonID'] = self.waterscenario['SeasonID'].astype(int)
         return self.waterscenario
 
     @staticmethod
