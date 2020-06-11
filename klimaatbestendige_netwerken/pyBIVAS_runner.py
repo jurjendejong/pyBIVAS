@@ -16,15 +16,14 @@ import xml.dom.minidom
 import logging
 from datetime import datetime
 from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
+from klimaatbestendige_netwerken.pyBIVAS_API import BIVAS_API
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+
 class BIVAS_runner():
-    # API settings
-    bivasurl = 'http://127.0.0.1'
-    outputsettingsfile = Path(__file__).parent / 'input/pyBIVAS_runner_OutputParameters.xml'
 
     def __init__(self, scenarioName: str, scenarioID: int, BIVAS_installation_dir, BIVAS_database_file=None):
         """
@@ -159,10 +158,8 @@ class BIVAS_runner():
         time.sleep(10)
 
         # Start simulation through the webapi
-        url = self.bivasurl + '/Scenarios/' + str(self.scenarioID) + '/Calculate'
-        headers = {'Content-Type': 'application/xml; charset=UTF-8'}
-        with open(self.outputsettingsfile, 'rb') as data:
-            requests.post(url, data=data, headers=headers, verify=False)
+        self.BIVAS_API = BIVAS_API()
+        self.BIVAS_API.post_calculation(self.scenarioID)
 
         logger.info('BIVAS simulation started')
         time.sleep(5)
@@ -172,24 +169,20 @@ class BIVAS_runner():
         Wait until the simulation is finished
         Then close BIVAS and continue
         """
+
         # Test if overall statistics can be requested
+        while True:
+            d = self.BIVAS_API.get_output_overallstatistics(self.scenarioID)
 
-        url = self.bivasurl + '/Scenarios/' + str(self.scenarioID) + '/Output/OverallStatistics'
-        data = None
-        headers = {'Accept': 'application/xml'}
-        d = None
-        while not d:
-            try:
-                d = requests.get(url, data=data, headers=headers, verify=False)
-            except ConnectionError as error:
-                logger.warning(f'Failed to connect: {error}')
+            if d.status_code == 200:
+                break
 
-            logger.info('{}: Waiting for BIVAS to finish...'.format(datetime.now()))
+            logger.info('Waiting for BIVAS to finish...')
             time.sleep(60)
 
-        logger.info(xml_to_string(d.text))
+        logger.info(d.text)
 
-        logger.info('{}: Finished!'.format(datetime.now()))
+        logger.info('Finished!')
 
         # Close BIVAS
         logger.info('Closing BIVAS')
@@ -198,7 +191,7 @@ class BIVAS_runner():
 
     def store(self, storage_dir, logfile=None):
         storage_dir = Path(storage_dir)
-        date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        date_string = datetime.now().strftime("%Y-%m-%d %H-%M")
 
         storage_file = storage_dir / f'Bivas_{self.scenarioName}.db'
         if storage_file.exists():
@@ -208,7 +201,7 @@ class BIVAS_runner():
 
         if logfile is not None:
             with open(storage_dir / logfile, 'a') as log:
-                log.write(f'{date_string}\t{storage_file.name}\t{self.description}')
+                log.write(f'{date_string}\t{storage_file.name}\t{self.description}\n')
 
 
 # class BIVAS_API:
@@ -243,7 +236,7 @@ if __name__ == '__main__':
     )
     p.prepare_database(
         waterscenario = Path(r'D:\path\to\Waterscenario_Q1000.csv'),
-        trafficScenarioID= 11
+        trafficscenario = 11
     )
 
     p.run()
