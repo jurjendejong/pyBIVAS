@@ -89,7 +89,6 @@ class pyBIVAS:
         By default connects to localhost
         """
 
-        import pymysql.cursors
         import pymysql
 
         self.connection = pymysql.connect(host=host,
@@ -129,9 +128,15 @@ class pyBIVAS:
             self.scenarioName = scenario
             self.scenarioID = scenarioOverview[scenarioOverview['Name'] == self.scenarioName].index[0]
         else:
-            self.scenarioID = scenarioOverview[scenarioOverview['Locked'] == 1].index[0]
-            self.scenarioName = scenarioOverview.loc[self.scenarioID, 'Name']
-            logger.info(f'ScenarioID not given. Assuming scenario: {self.scenarioID} - {self.scenarioName}')
+            finishedruns = scenarioOverview['Locked'] == 1
+            if finishedruns.any():
+                self.scenarioID = scenarioOverview[finishedruns].index[0]
+                self.scenarioName = scenarioOverview.loc[self.scenarioID, 'Name']
+                logger.info(f'ScenarioID not given. Assuming scenario with output: {self.scenarioID} - {self.scenarioName}')
+            else:
+                self.scenarioID = scenarioOverview.index[0]
+                self.scenarioName = scenarioOverview.loc[self.scenarioID, 'Name']
+                logger.info(f'ScenarioID not given. Assuming scenario without output: {self.scenarioID} - {self.scenarioName}')
 
         self.trafficScenario = scenarioOverview.loc[self.scenarioID,
                                                     'TrafficScenarioID']
@@ -348,6 +353,24 @@ class pyBIVAS:
             sql_where = sql_where[:-5]
 
             if include_all_columns:
+                sql_select += """
+                    trips.*,
+                    routes.OriginalArcDirection,
+                    route_statistics.*,
+                    ship_types.Label AS ship_types_Label,
+                    ship_types.Description AS ship_types_Description,
+                    cemt_class.ID AS cemt_class_ID,
+                    cemt_class.Description AS cemt_class_Description,
+                    nst2007_mapping.*,
+                    appearance_types.Description AS appearance_types_Description,
+                    dangerous_goods_levels.Description AS dangerous_goods_levels_Description,"""
+                sql_leftjoin += """
+                    LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                    LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                    LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
+                    LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
+                    LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
+                    LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID"""
                 sql_groupby = 'Trips.ID'
 
         if not sql_where:
