@@ -193,8 +193,8 @@ class WaterdepthGrid:
                 # sideslode when the width converges to 0
                 D_lowest = depth_at_fullwidth - (channelwidth - 0) / 2 * (1 / sideslope)
 
-                Lookupcurve_x = [D_lowest, channelwidth, channelwidth]
-                Lookupcurve_y = [0, depth_at_fullwidth, 99]
+                Lookupcurve_x = [0, channelwidth, channelwidth]
+                Lookupcurve_y = [D_lowest, depth_at_fullwidth, 99]
 
                 # Find where on this line this map is
                 first_line = LineString(np.column_stack((ZW_table['W'], ZW_table['Z'])))
