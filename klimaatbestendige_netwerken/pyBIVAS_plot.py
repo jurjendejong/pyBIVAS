@@ -382,6 +382,14 @@ class pyBIVAS_plot(pyBIVAS):
         plt.close()
 
     def plot_tijdseries_vloot(self, arcID, label, time_start='2018-03', time_end='2018-06'):
+        """
+
+        :param arcID:
+        :param label: Label for filename and title
+        :param time_start: Time start of normalised period
+        :param time_end: Time end of normalised period
+        :return:
+        """
         figdir = self.outputdir / 'figures_Tijdseries_vloot'
         if not figdir.exists():
             figdir.mkdir()
@@ -389,8 +397,8 @@ class pyBIVAS_plot(pyBIVAS):
         df = self.arc_tripdetails(arcID)
 
         ordered_ship_types, data_merge_small_ships = self.remove_small_ships(df)
-        data = data_merge_small_ships.groupby(['DateTime', 'ship_types_Label']).count()['Depth__m'].unstack()[
-            ordered_ship_types].fillna(0)
+        data = data_merge_small_ships.groupby(['DateTime', 'ship_types_Label']).count()['Depth__m'].unstack().reindex(
+            ordered_ship_types, axis=1).fillna(0)
 
         fullyear = pd.date_range('01-01-{}'.format(data.index[0].year), '31-12-{}'.format(data.index[0].year))
         data = data.reindex(fullyear, fill_value=0)
