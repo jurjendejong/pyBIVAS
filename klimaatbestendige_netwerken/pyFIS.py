@@ -1,6 +1,8 @@
 """
 Module to read geodata of the Fairway Information Services of Rijkswaterstaat (http://vaarweginformatie.nl).
 
+https://github.com/jurjendejong/klimaatbestendige_netwerken/blob/master/klimaatbestendige_netwerken/pyFIS.py
+
 Jurjen de Jong, Deltares, 24-9-2019
 """
 
