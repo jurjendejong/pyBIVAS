@@ -353,23 +353,19 @@ class pyBIVAS:
             sql_where = sql_where[:-5]
 
             if include_all_columns:
-                sql_select += """
+                sql_select += f"""
                     trips.*,
-                    routes.OriginalArcDirection,
                     route_statistics.*,
                     ship_types.Label AS ship_types_Label,
                     ship_types.Description AS ship_types_Description,
                     cemt_class.ID AS cemt_class_ID,
                     cemt_class.Description AS cemt_class_Description,
                     nst2007_mapping.*,
-                    appearance_types.Description AS appearance_types_Description,
                     dangerous_goods_levels.Description AS dangerous_goods_levels_Description,"""
-                sql_leftjoin += """
+                sql_leftjoin += f"""
                     LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
                     LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
-                    LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
                     LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
-                    LEFT JOIN route_statistics_{self.scenarioID} AS route_statistics ON route_statistics.TripID = routes.TripID
                     LEFT JOIN load_types ON trips.LoadTypeID = load_types.ID"""
                 sql_groupby = 'Trips.ID'
 
@@ -390,6 +386,17 @@ class pyBIVAS:
 
         # Use short strings for NSTR classes
         df = df.replace({'NSTR': self.NSTR_shortnames})
+        df = df.replace({'Vorm': self.appeareance_rename})
+
+        # Extra kolommen:
+        if include_all_columns:
+            df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
+            C_w = 0.9 # could also be received from database, but it's constant anyway
+            df['TPMCI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
+            df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPMCI']*100)
+            df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPMCI']*100)
+            df['Totale Vaarkosten per TonKM'] = df['Totale Vaarkosten (EUR)'] / df['Totale TonKM (TONKM)']
+
 
         # Format dates
         if group_by and 'Days' in group_by:
@@ -629,11 +636,13 @@ class pyBIVAS:
         df = df.replace({'appearance_types_Description': self.appeareance_rename})
 
         # Extra kolommen:
-        df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
-        C_w = 0.9 # could also be received from database, but it's constant anyway
-        df['TPMCI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
-        df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPMCI']*100)
-        df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPMCI']*100)
+        if extended:
+            df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
+            C_w = 0.9 # could also be received from database, but it's constant anyway
+            df['TPMCI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
+            df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPMCI']*100)
+            df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPMCI']*100)
+            df['Totale Vaarkosten per TonKM'] = df['Totale Vaarkosten (EUR)'] / df['Totale TonKM (TONKM)']
 
         if group_by == 'trips.ID':
             df = df.set_index('ID')
@@ -940,7 +949,9 @@ class pyBIVAS:
         sql = """
         SELECT *
         FROM nodes
-        """
+        LEFT JOIN `branching$branch_sets` AS BS ON nodes.BranchSetID = BS.Id
+        WHERE BS.BranchID = {0}
+        """.format(self.scenarioID)
         nodes = self.sql(sql).set_index('ID')
         nodes['geometry'] = nodes.apply(
             lambda z: Point(z.XCoordinate, z.YCoordinate), axis=1)
