@@ -44,8 +44,10 @@ class BIVAS_runner():
             BIVAS_database_file = Path(BIVAS_database_file)
             assert BIVAS_database_file.exists(), 'BIVAS database not found'
 
-            logger.info('Copying databasefile to run folder')
-            shutil.copyfile(BIVAS_database_file, self.BIVAS_installation_dir / 'Bivas.db')
+            logger.info('Remove old file and copy new databasefile to run folder')
+            if self.BIVAS_database.exists():
+                self.BIVAS_database.unlink()  # From Python 3.8, .unlink(missing_ok=True)
+            shutil.copyfile(BIVAS_database_file, self.BIVAS_database)
         assert self.BIVAS_database.exists(), 'BIVAS database not found'
 
     def prepare_database(self, waterscenario=None, trafficscenario=None):
@@ -174,7 +176,7 @@ class BIVAS_runner():
         while True:
             d = self.BIVAS_API.get_output_overallstatistics(self.scenarioID)
 
-            if d.status_code == 200:
+            if (d is not None) and (d.status_code == 200):
                 break
 
             logger.info('Waiting for BIVAS to finish...')
@@ -202,29 +204,6 @@ class BIVAS_runner():
         if logfile is not None:
             with open(storage_dir / logfile, 'a') as log:
                 log.write(f'{date_string}\t{storage_file.name}\t{self.description}\n')
-
-
-# class BIVAS_API:
-#
-#     post_headers = {'Content-Type': 'application/xml; charset=UTF-8'}
-#     get_headers = {'Accept': 'application/xml'}
-#
-#     def __init__(self):
-#         self.bivas_url='http://127.0.0.1'
-#
-#     def post_calculation(self, scenario_id, xmlfile_outputsettings):
-#         url = self.bivasurl + '/Scenarios/' + str(scenario_id) + '/Calculate'
-#         with open(outputsettingsfile, 'rb') as data:
-#             requests.post(url, data=data, headers=post_headers, verify=False)
-#
-#     def get_output_overallstatistics(self, scenario_id):
-#         url = self.bivasurl + '/Scenarios/' + str(scenario_id) + '/Output/OverallStatistics'
-#         d = requests.get(url, data=None, headers=self.get_headers, verify=False)
-#         return d
-
-def xml_to_string(xmlstring):
-    xmldom = xml.dom.minidom.parseString(xmlstring)
-    pretty_xml_as_string = xmldom.toprettyxml()
 
 
 if __name__ == '__main__':
