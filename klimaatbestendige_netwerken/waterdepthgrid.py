@@ -10,7 +10,8 @@ import geopandas as gpd
 import logging
 from klimaatbestendige_netwerken.externals.dep import Dep
 from klimaatbestendige_netwerken.externals.grid import Grid
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon, LineString, MultiPoint, Point
+from shapely.ops import split
 import numpy as np
 
 logging.basicConfig(level=logging.INFO)
@@ -93,25 +94,6 @@ class WaterdepthGrid:
 
         self.gpd['waterdepth'] = self.gpd_add_coverage(self.gpd, self.waterdepth)
 
-    # def add_sections(self, sections_shapefile):
-    #     """
-    #     Create sections or selection of active cells in the grid
-    #     """
-    #     gpd_channel_sections = gpd.read_file(sections_shapefile)
-    #     gpd_channel_sections = gpd_channel_sections.set_index('OBJECTID').sort_index()
-    #
-    #     gpd_channel = gpd_channel_sections.unary_union
-    #
-    #     self.pd_sections = pd.DataFrame(
-    #         index=self.gpd.index,
-    #     )
-    #
-    #     self.pd_sections['union'] = self.gpd.intersects(gpd_channel['geometry'])
-    #
-    #     for objectid, feature in gpd_channel_sections:
-    #         object_name = feature[0]
-    #         self.pd_sections[object_name] = self.gpd.intersects(feature['geometry'])
-
     def compute_width_depth_table(self):
         """
         Multiple functions to compute properties of waterdepth and corresponding width for each crosssection
@@ -130,28 +112,12 @@ class WaterdepthGrid:
             gpd_row = self.gpd.loc[ii]
             gpd_row = gpd_row.dropna(how='any')
 
-            W = gpd_row['width'].cumsum().values
-            Z = gpd_row['waterdepth'].values
-
-            # Add zeros all around to make sure interpolation of low numbers goes correct
-            W = np.insert(W, 0, 0)
-            W = np.append(W, np.max(W))
-            Z = np.insert(Z, 0, 0)
-            Z = np.append(Z, 0)
-
-            # Compute depth_width_relation
-            max_depth = np.max(Z)
-            stepsize = 0.01
-            min_depth = 0
-
-            depths = np.arange(min_depth, max_depth, stepsize)[1:-1]  # skip first element (crash in interp)
-
+            depths = []
             widths = []
-            for z in depths:
-                width_max = self.compute_largest_width_for_depth(W, Z, depth=z)
-                widths.append(width_max)
+            for ii in range(1, gpd_row.shape[0]+1):
+                depths.append(gpd_row['waterdepth'].rolling(window=ii).min().max())
+                widths.append(ii * gpd_row['width'].mean())  # Assuming the widths are equal
 
-            # self.ZW_table[n_row] = pd.Series(index=depths, data=widths)
             self.ZW_table[n_row] = {
                 'Z': depths,
                 'W': widths,
@@ -201,8 +167,13 @@ class WaterdepthGrid:
                 second_line = LineString(np.column_stack((Lookupcurve_x, Lookupcurve_y)))
                 intersection = first_line.intersection(second_line)
 
-                width_n = intersection.x
-                depth_n = intersection.y
+                if isinstance(intersection, Point):
+                    width_n = intersection.x
+                    depth_n = intersection.y
+                else:
+                    # If no intersection, than take last row of ZW-table (so max width)
+                    width_n = first_line.coords[-1][0]
+                    depth_n = first_line.coords[-1][1]
 
             channel_depth[n_row] = depth_n
             channel_width[n_row] = width_n
@@ -235,7 +206,6 @@ class WaterdepthGrid:
         polygons = []
         m = []
         n = []
-        # cov = {k: [] for k in coverages.keys()}
         for i in range(rows - 1):
             for j in range(cols - 1):
                 polygons.append(Polygon(
@@ -247,25 +217,23 @@ class WaterdepthGrid:
                 m.append(i)
                 n.append(j)
 
-                # for coverage_name, coverage in coverages.items():
-                #     cov[coverage_name].append(coverage.val[i + 1, j + 1])
-
         # Construct geopandas
         polygons = gpd.GeoDataFrame({
             'm': m,
             'n': n,
             'geometry': polygons, })
 
-        # Add coverages as columns
-        # for coverage_name, coverage in cov.items():
-        #     polygons[coverage_name] = coverage
-
         # Drop empty rows
         polygons = polygons.dropna(how='any')
 
-        # Derive additional properties
-        # Assuming L >> b, b = 2* A/R
-        polygons['width'] = 2 * polygons.geometry.area / polygons.geometry.length
+        # Compute width: h = 2*A/(a+b)
+        for ii, p in polygons.geometry.items():
+            segments = split(p.boundary, MultiPoint(p.boundary.coords[1:]))
+            side_lengths = sorted([s.length for s in segments])
+
+            h = 2 * p.area / (side_lengths[2] + side_lengths[3])
+
+            polygons.loc[ii, 'width'] = h
 
         return polygons
 

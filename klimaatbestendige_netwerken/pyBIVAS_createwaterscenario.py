@@ -20,6 +20,7 @@ from shapely.ops import nearest_points
 
 class CreateWaterScenario:
     def __init__(self):
+        self.reach = {}
         pass
 
     def load_sobek(self, SOBEK_output_reachsegments: Path, SOBEK_output_gridpoints: Path, SOBEK_network_file: Path,
@@ -189,8 +190,7 @@ class CreateWaterScenario:
             ii_start = self.nearest_df_row(df_depth, section['point_start'])
             ii_end = self.nearest_df_row(df_depth, section['point_end'])
             reach = df_depth.loc[ii_start: ii_end].copy()
-
-            reach.reset_index().to_file(f'waterdieptegrid_{label}.shp')
+            self.reach[label] = reach
 
             # Get list of BIVAS arcs that need to be updated
             BIVAS_node_start = self.nearest_df_row(self.BIVAS_nodes, section['point_start'])
