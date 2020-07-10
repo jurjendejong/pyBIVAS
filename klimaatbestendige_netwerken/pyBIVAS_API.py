@@ -3,6 +3,9 @@ import requests
 import xmltodict
 import logging
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 # TODO: Implement method to adjust this in an easy way
 data_post_calculation = """
 <Output>
@@ -115,9 +118,14 @@ class BIVAS_API:
 
     @staticmethod
     def get_request(url, headers):
-        d = requests.get(url, data=None, headers=headers, verify=False)
+        try:
+            d = requests.get(url, data=None, headers=headers, verify=False)
+        except requests.exceptions.ConnectionError:
+            logger.error('Connection abort error')
+            return None
+
         if d.status_code != 200:
-            logging.error(f'Response code: {d.status_code}')
+            logger.error(f'Response code: {d.status_code}')
         else:
             d.dict = xmltodict.parse(d.text)
         return d
