@@ -463,13 +463,17 @@ class pyBIVAS_plot(pyBIVAS):
         appearanceTypesOrder = self.appearancetypes()['Description'][::-1]
         if userealtrips:
             data = data_merge_small_ships.groupby(['ship_types_Label', 'appearance_types_Description']
-                                                  ).count()['Depth__m'].unstack().loc[
-                ordered_ship_types, appearanceTypesOrder].fillna(0)  # TODO: Change .loc[] to .reindex()
+                                                  ).count()['Depth__m']\
+                .unstack().\
+                reindex(ordered_ship_types, axis=0, fill_value=0).\
+                reindex(appearanceTypesOrder, axis=0, fill_value=0)
 
         else:
             data = data_merge_small_ships.groupby(['ship_types_Label', 'appearance_types_Description']
-                                                  ).sum()["Aantal Vaarbewegingen (-)"].unstack().loc[
-                ordered_ship_types, appearanceTypesOrder].fillna(0)  # TODO: Change .loc[] to .reindex()
+                                                  ).sum()["Aantal Vaarbewegingen (-)"]\
+                .unstack().\
+                reindex(ordered_ship_types, axis=0, fill_value=0).\
+                reindex(appearanceTypesOrder, axis=0, fill_value=0)
         data.plot.bar(stacked=True, width=0.9, zorder=3, figsize=(8, 6), color=['C0', 'C1', 'C2', '#555555'])
         plt.gca().legend(*map(reversed, plt.gca().get_legend_handles_labels()), loc='center left',
                          bbox_to_anchor=(1, 0.5))
