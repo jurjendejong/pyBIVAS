@@ -1139,7 +1139,7 @@ class pyBIVAS:
 
         if per_direction:
             df = df.pivot(columns='Vaarrichting')
-            df.rename(mapper=self.directions_dutch, inplace=True)
+            df.rename(mapper=self.directions_dutch, inplace=True, axis=1)
         df = df['nTrips']
         fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
         df = df.reindex(fullyear, fill_value=0)
