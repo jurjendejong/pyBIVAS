@@ -3,17 +3,20 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import SymLogNorm
-import klimaatbestendige_netwerken.pyBIVAS_KBN_plots as KBN
+from klimaatbestendige_netwerken.pyBIVAS_KBN_plots import read_scenarios
 
 # These are not really classes but I used it to group the functions..
 class infeasible_trips:
 
     @staticmethod
-    def compute_all_infeasible_trips(T, IT, Qref, max_distance=2, max_time=3, max_abs_costs=3, max_rel_costs=5):
+    def compute_all_infeasible_trips(T, IT, Qref, relaxation_per_trip=None, max_distance=2, max_time=3,
+                                     max_abs_costs=3, max_rel_costs=5, manual=None):
         """
 
         :param T: Trips data
         :param IT: Infeasible trips data
+        :param Qref
+        :param relaxation_per_trip
         :param max_distance:
         :param max_time:
         :param max_abs_costs:
@@ -56,13 +59,25 @@ class infeasible_trips:
         IT_costs_rel = pd.concat(IT_costs_rel, axis=1)
 
         # Combine criteria
-        IT_combined = pd.concat({
+        criteria_combined = {
             'Rel beladingsgraad': IT_relbeladingsgraad,
             'Distance': IT_distance,
             'Time': IT_time,
             'Costs abs': IT_costs_abs,
             'Costs rel': IT_costs_rel,
-        }, axis=1)
+        }
+
+        if relaxation_per_trip is not None:
+            delta_relaxation_per_trip = relaxation_per_trip.subtract(relaxation_per_trip[Qref], axis=0)
+
+            infeasible_relaxation = (delta_relaxation_per_trip > 1e5)
+
+            criteria_combined['Relaxation'] = infeasible_relaxation
+
+        if manual is not None:
+            criteria_combined['Manual'] = manual
+
+        IT_combined = pd.concat(criteria_combined, axis=1)
 
         IT_combined = IT_combined.fillna(False)
         IT_combined = IT_combined[IT_combined.any(axis=1)]
@@ -75,7 +90,7 @@ class infeasible_trips:
 
         all_infeasible = IT_combined.any(axis=1, level=1)
 
-        return always_infeasible, all_infeasible
+        return IT_combined, always_infeasible, all_infeasible
 
     @staticmethod
     def trips_below_abs_beladingsgraad(T, min_abs_beladingsgraad=0.20):
@@ -179,7 +194,7 @@ class increase_empty_trips:
         df_Leeg = df.loc[ii, ['Origin_Zone', 'Destination_Zone', 'cemt_class_Description']]
 
         # For each 'leeg' trip in list get the relatieve toename
-        toename_per_trip = pd.read_pickle(f'Lege schepen/Toename_lege_vaarbewegingen_{s}.pkl')
+        toename_per_trip = pd.read_pickle(f'../1_Output_conversion/Lege schepen/Toename_lege_vaarbewegingen_{s}.pkl')
         toename_per_trip = toename_per_trip.stack().reindex(df_Leeg.values)
 
         # Adjust these columns
@@ -193,14 +208,16 @@ class increase_empty_trips:
         return df
 
 
+
+
 # Minimum example to compute infeasible trips
 if __name__ == "__main__":
     scenarios_Q = ['Q1020', 'Q1800']
     Qref = 'Q1800'
 
     # Read data
-    IT = KBN.read_scenarios('infeasibletrips.pkl', scenarios_Q, addcolumns=False, dropinfeasible=False, increaseemptytrips=False)
-    T = KBN.read_scenarios('routestatistics_alltrips.pkl', scenarios_Q, addcolumns=False, dropinfeasible=False, increaseemptytrips=False)
+    IT = read_scenarios('infeasibletrips.pkl', scenarios_Q, addcolumns=False, dropinfeasible=False, increaseemptytrips=False)
+    T = read_scenarios('routestatistics_alltrips.pkl', scenarios_Q, addcolumns=False, dropinfeasible=False, increaseemptytrips=False)
 
     # Compute infeasible
     always_infeasible, all_infeasible = infeasible_trips.compute_all_infeasible_trips(T, IT, Qref=Qref)
@@ -215,7 +232,7 @@ if __name__ == "__main__":
     Qref = 'Q1800'
 
     # Read data
-    T = KBN.read_scenarios('routestatistics_alltrips.pkl', scenarios_Q, increaseemptytrips=False, addcolumns=False)
+    T = read_scenarios('routestatistics_alltrips.pkl', scenarios_Q, increaseemptytrips=False, addcolumns=False)
 
     # Compute
     for s in scenarios_Q:
