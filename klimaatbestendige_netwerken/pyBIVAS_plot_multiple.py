@@ -12,7 +12,6 @@ logger.setLevel(logging.INFO)
 
 
 class pyBIVAS_plot_compare:
-
     Arcs = pyBIVAS.Arcs
 
     def __init__(self, BIVAS_simulations: dict, scenarioID=None):
@@ -111,11 +110,10 @@ class pyBIVAS_plot_compare:
             'largestIncreaseDate' -- Get trips on the date with the largest increase in costs
             'database' -- Use database sort
             'larger' -- Get the largest routes
-            arcID
-            [list_of_arcID]
+            routeID
+            [list_of_routeID]
 
         TODO: include option to only show one simulation, or more than 2
-        TODO: add NST2007, Beladingsgraad (2x),
         """
 
         for name, BIVAS in self.BIVAS_connection.items():
@@ -193,11 +191,8 @@ class pyBIVAS_plot_compare:
         else:
             if isinstance(routes, list):
                 all_routes = routes
-            elif isinstance(routes, int):
-                all_routes = [routes]
             else:
-                logger.error('Unknown input')
-                all_routes = None
+                all_routes = [int(routes)]
 
         if shuffle:
             random.shuffle(all_routes)
@@ -207,6 +202,10 @@ class pyBIVAS_plot_compare:
         background = geopandas.read_file(background_shapefile)
         river_background = geopandas.read_file(rivers_shapefile)
 
+        all_arcs = BIVAS.arcs
+        all_arcs_major = all_arcs[all_arcs['CemtClassId'] >= 5]
+        all_arcs_minor = all_arcs[all_arcs['CemtClassId'] < 5]
+
         ref = self.reference
         case = list(self.BIVAS_connection.keys())[1]
 
@@ -215,11 +214,14 @@ class pyBIVAS_plot_compare:
 
             # Background map
             background.plot(figsize=(14, 14), color='#DDDDDD', edgecolor='#BBBBBB')
+            # background.plot(figsize=(20, 14), color='#DDDDDD', edgecolor='#BBBBBB')
             ax = plt.gca()
             ax.axis('equal')
             ax.autoscale(False)
             ax.grid()
-            river_background.plot(ax=ax, color='b')
+            # river_background.plot(ax=ax, color='b')
+            all_arcs_major.plot(ax=ax, color='b', alpha=0.4)
+            all_arcs_minor.plot(ax=ax, color='b', alpha=0.1)
 
             # Data from reference route
             route = self.BIVAS_connection[ref].route_arcs(routes)
@@ -232,12 +234,13 @@ class pyBIVAS_plot_compare:
 
             # Plot reference route and data
             route.plot(color='r', ax=ax)
-            startpoint.plot(ax=ax, color='k', markersize=7, label='Start')
-            plt.annotate(s=startpoint['Name'].iloc[0], xy=startpoint['geometry'].iloc[0].coords[:][0])
-            endpoint.plot(ax=ax, color='b', markersize=7, label='End')
-            plt.annotate(s=endpoint['Name'].iloc[0], xy=endpoint['geometry'].iloc[0].coords[:][0])
-            plt.text(0.05, 0.96, 'RouteID: {}'.format(routestats['TripID'][0]), ma='left', transform=ax.transAxes,
-                     size='larger', va='top')
+            startpoint.plot(ax=ax, color='k', markersize=12, label='Start')
+            plt.annotate(startpoint['Name'].iloc[0], xy=startpoint['geometry'].iloc[0].coords[:][0])
+            endpoint.plot(ax=ax, color='b', markersize=12, label='End')
+            plt.annotate(endpoint['Name'].iloc[0], xy=endpoint['geometry'].iloc[0].coords[:][0])
+            # plt.text(0.05, 0.96, 'RouteID: {}'.format(routestats['TripID'][0]), ma='left', transform=ax.transAxes,
+            #          size='larger', va='top')
+            plt.title('RouteID: {}'.format(routestats['TripID'][0]))
 
             if not case:
                 shipbox = """Date: {r[DateTime]}
@@ -271,41 +274,48 @@ Load capacity: {r[LoadCapacity__t]:.1f} ton""".format(r=routestats.iloc[0])
 
                 shipbox = """Date: {r[DateTime]}
 NSTR: {r[nstr_description]}
-Vorm: {r[appear_description]}
+NST2007: {r[nst2007_description]}
+Ladingtype: {r[appear_description]}
 Kegel: {r[dangerous_description]}
-Scheepstype: {r[ship_label]} - {r[ship_description]}
+Scheepstype: {r[ship_label]} - {r[ship_description]} (CEMT: {r[cemt_class]})
 Scheepslengte: {r[Length__m]} m
 Scheepsbreedte: {r[Width__m]} m
-Diepgang: {r[Depth__m]:.2f} m
-TEU:  {r[TwentyFeetEquivalentUnits]:.0f}
-TotalWeight: {r[TotalWeight__t]:.1f} ton
-Load capacity: {r[LoadCapacity__t]:.1f} ton
+Laadvermogen: {r[LoadCapacity__t]:.1f} ton
+Herkomst: {herkomst}
+Bestemming: {bestemming}
 
 {s1}
+Diepgang: {r[Depth__m]:.2f} m
+Aantal reizen: {r[NumberOfTrips]:.1f}
+Vracht: {r[TotalWeight__t]:.1f} ton ({r[TwentyFeetEquivalentUnits]:.0f} TEU)
+Beladingsgraad: {r[Beladingsgraad]:.1%}
 Totale reistijd: {r[TravelTime__min]:.0f} min
 Totale afstand: {r[Distance__km]:.0f} km
 Variabele-tijd kosten: {r[VariableTimeCosts__Eur]:.0f} EUR
 Variabele-afstand kosten: {r[VariableDistanceCosts__Eur]:.0f} EUR
 Vaste kosten: {r[FixedCosts__Eur]:.0f} EUR
 Energiegebruik: {r[EnergyUse__kWh]:.0f} kWh
-Number of Trips: {r[NumberOfTrips]:.1f}
 
 {s2}
+Diepgang: {r2[Depth__m]:.2f} m
+Aantal reizen: {r2[NumberOfTrips]:.1f}
+Vracht: {r2[TotalWeight__t]:.1f} ton ({r2[TwentyFeetEquivalentUnits]:.0f} TEU)
+Beladingsgraad: {r2[Beladingsgraad]:.1%}
 Totale reistijd: {r2[TravelTime__min]:.0f} min
 Totale afstand: {r2[Distance__km]:.0f} km
 Variabele-tijd kosten: {r2[VariableTimeCosts__Eur]:.0f} EUR
 Variabele-afstand kosten: {r2[VariableDistanceCosts__Eur]:.0f} EUR
 Vaste kosten: {r2[FixedCosts__Eur]:.0f} EUR
 Energiegebruik: {r2[EnergyUse__kWh]:.0f} kWh
-Number of Trips: {r2[NumberOfTrips]:.1f}""".format(r=routestats.iloc[0], r2=routestats2.iloc[0], s1=ref,
-                                                           s2=case)
+""".format(r=routestats.iloc[0], r2=routestats2.iloc[0], s1=ref, s2=case,
+           herkomst=startpoint['Name'].iloc[0], bestemming=endpoint['Name'].iloc[0])
 
-            plt.text(0.05, 0.93, shipbox, ma='left', transform=ax.transAxes, va='top')
+            plt.text(0.02, 0.98, shipbox, ma='left', transform=ax.transAxes, va='top')
             if len(referencestrips) > 0:
                 referencestrips.plot(ax=ax, marker='s', markersize=7, column='PointPassed', cmap='RdYlGn', vmax=1,
                                      vmin=0)
 
-            plt.savefig(self.outputdir / 'route_{:06}.png'.format(routes))
+            plt.savefig(self.outputdir / 'route_{:06}_{}_{}.png'.format(routes, ref, case))
             plt.clf()
             plt.close()
 
