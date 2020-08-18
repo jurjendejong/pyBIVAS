@@ -459,19 +459,31 @@ class pyBIVAS:
         SELECT  trips.*,
                 route.*,
                 nstr_mapping.Description AS nstr_description,
+                nst2007_mapping.Description AS nst2007_description,
                 appearance_types.Description AS appear_description,
                 ship_types.Label AS ship_label,
                 ship_types.Description as ship_description,
+                cemt_class.Description as cemt_class,
                 dangerous_goods_levels.Description AS dangerous_description
         FROM route_statistics_{0} AS route
         LEFT JOIN trips_{0} AS trips ON route.TripID = trips.ID
         LEFT JOIN nstr_mapping ON trips.NstrGoodsClassification = nstr_mapping.GroupCode
+        LEFT JOIN nst2007_mapping ON trips.Nst2007GoodsClassification = nst2007_mapping.Id
         LEFT JOIN appearance_types ON trips.AppearanceTypeID = appearance_types.ID
         LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+        LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
         LEFT JOIN dangerous_goods_levels ON trips.DangerousGoodsLevelID = dangerous_goods_levels.ID
         WHERE TripID = {1}
         """.format(self.scenarioID, routeID)
         routestats = self.sql(sql)
+
+        routestats['Beladingsgraad'] = routestats['TotalWeight__t'] / routestats['LoadCapacity__t']
+        # C_w = 0.9 # could also be received from database, but it's constant anyway
+        # routestats['TPMCI'] = 0.01 * routestats['Length__m'] * routestats['Width__m'] * C_w
+        # routestats['Ledige_diepgang'] = routestats['Depth__m'] - routestats['TotalWeight__t'] / (routestats['TPMCI']*100)
+        # routestats['Maximale_diepgang'] = routestats['Depth__m'] + (routestats['LoadCapacity__t'] - routestats['TotalWeight__t']) / (routestats['TPMCI']*100)
+        # routestats['Totale Vaarkosten per TonKM'] = routestats['Totale Vaarkosten (EUR)'] / routestats['Totale TonKM (TONKM)']
+
         return routestats
 
     def route_countingpoints(self, routeID, validateroute=None):
@@ -511,6 +523,50 @@ class pyBIVAS:
                 referencestrips['ArcID'], validateroute['ArcID'])
         referencestrips['geometry'] = referencestrips['geometry'].representative_point()
         return referencestrips
+
+    def route_computerelaxation(self, tripID, LengthPenalty=None, WidthPenalty=None):
+        """
+        For a given tripID compute the relexation per arc and in total
+        :param tripID:
+        :param LengthPenalty:
+        :param WidthPenalty:
+        :return:
+        """
+
+        if (LengthPenalty is None) or (WidthPenalty is None):
+            LengthPenalty, WidthPenalty = \
+            self.scenario_parameters()[['RestrictionRelaxationLengthPenalty__min_m_km',
+                                        'RestrictionRelaxationWidthPenalty__min_dm_km']].values[0]
+
+        # Get parameters of ship
+        routestats = self.route_stats(tripID)
+        ship_length, ship_width = routestats.loc[0, ['Length__m', 'Width__m']]
+
+        # Get route of ship and properties of this route
+        arcs = self.route_arcs(tripID)
+        arcs = arcs.set_index('ArcID')[['MaximumLength__m', 'MaximumWidth__m', 'Length__m']]
+        arcs = arcs.replace({0: np.nan})
+
+        # Compute relaxation
+        arcs['relaxation_op_lengte'] = (ship_length - arcs['MaximumLength__m'])
+        arcs_sel = arcs[arcs['relaxation_op_lengte'] > 0]
+        arcs['Relaxation_penalty_length'] = arcs_sel['relaxation_op_lengte'] * (
+                arcs_sel['Length__m'] / 1000) * LengthPenalty
+
+        arcs['relaxation_op_breedte'] = (ship_width - arcs['MaximumWidth__m'])
+        arcs_sel = arcs[arcs['relaxation_op_breedte'] > 0]
+        arcs['Relaxation_penalty_width'] = (arcs_sel['relaxation_op_breedte'] * 10) * (
+                arcs_sel['Length__m'] / 1000) * WidthPenalty
+
+
+        arcs = arcs.fillna(0)
+        arcs['Relaxation_penalty'] = arcs['Relaxation_penalty_length'] + arcs['Relaxation_penalty_width']
+
+        # Summarise
+        penalty_per_arc = arcs['Relaxation_penalty']
+        penalty_total = penalty_per_arc.sum()
+
+        return penalty_per_arc, penalty_total
 
     def infeasibletrips_timeseries(self):
         """Infeasible Trips in scenario per date"""
@@ -1103,30 +1159,76 @@ class pyBIVAS:
         countingPoints = countingPoints.join(arcs, how='left', on='ArcID', rsuffix='_arcs')
         return countingPoints
 
-    def countingpoint_timeseries(self, referenceSetId, countingPointName, trafficScenarioId, per_direction=True):
+    def countingpoint_timeseries(self, referenceSetId, countingPointName, trafficScenarioId, pivot='Vaarrichting',
+                                 param="Aantal Vaarbewegingen (-)"):
         """
         Create timeserie of all trips passing a countingpoint in the referenceset.
         Possible to differentiate per direction, or have it combined
+
+        pivot: None, "Vaarrichting", "Bestemming", "Herkomst", "Scheepvaartklasse", "CEMT-klasse"
         """
-        if per_direction:
-            groupby = '"Days", counting_points.DirectionID'
+
+        sql_select = 'DATE(trips.DateTime) AS "Days"'
+        sql_leftjoin = ''
+        sql_groupby = '"Days"'
+        sql_where = ''
+
+
+        if pivot == 'Vaarrichting':
+            sql_select += ', directions.Label AS Vaarrichting'
+            sql_groupby += ', counting_points.DirectionID'
+            sql_leftjoin += 'LEFT JOIN directions on counting_points.DirectionID == directions.ID'
+        elif pivot == 'Bestemming':
+            zone_definition_id = 9
+            sql_leftjoin += 'LEFT JOIN zone_node_mapping AS znm_Destination ON trips.DestinationTripEndPointNodeID = znm_Destination.NodeID '
+            sql_leftjoin += 'LEFT JOIN zones AS zones_destination ON znm_Destination.ZoneID = zones_destination.ID '
+            sql_groupby += ', Bestemming'
+            sql_select += ', zones_destination.Name AS Bestemming'
+            sql_where += f' AND zones_destination.ZoneDefinitionID = {zone_definition_id} AND znm_Destination.ZoneDefinitionID = {zone_definition_id}'
+        elif pivot == 'Herkomst':
+            zone_definition_id = 9
+            sql_leftjoin += 'LEFT JOIN zone_node_mapping AS znm_Origin ON trips.OriginTripEndPointNodeID = znm_Origin.NodeID '
+            sql_leftjoin += 'LEFT JOIN zones AS zones_origin ON znm_Origin.ZoneID = zones_origin.ID '
+            sql_groupby += ', Herkomst'
+            sql_select += ', zones_origin.Name AS Herkomst'
+            sql_where += f' AND zones_origin.ZoneDefinitionID = {zone_definition_id} AND znm_Origin.ZoneDefinitionID = {zone_definition_id}'
+        elif pivot == 'Scheepvaartklasse':
+            sql_select += f"""
+                 , ship_types.Label AS Scheepvaartklasse
+                 """
+            sql_leftjoin += f"""
+                 LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                 LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                 """
+            sql_groupby += ', Scheepvaartklasse'
+        elif pivot == 'CEMT-klasse':
+            sql_select += f"""
+                 , cemt_class.Description AS "CEMT-klasse"
+                 """
+            sql_leftjoin += f"""
+                 LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                 LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                 """
+            sql_groupby += ', "CEMT-klasse"'
         else:
-            groupby = '"Days"'
+            pass
+
 
         sql = f"""
         SELECT
-        DATE(trips.DateTime) AS "Days",
-        directions.Label AS Vaarrichting,
-        count(*) AS nTrips
+        {sql_select},
+        SUM(trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
+        SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)"
         FROM reference_trip_set
         LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
         LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
-        LEFT JOIN directions on counting_points.DirectionID == directions.ID
+        {sql_leftjoin}
         WHERE ReferenceSetID = {referenceSetId}
         AND counting_points.Name = "{countingPointName}"
         AND trips.TrafficScenarioID = {trafficScenarioId}
         AND trips.NumberOfTrips > 0
-        GROUP BY {groupby}
+        {sql_where}
+        GROUP BY {sql_groupby}
         """
         df = self.sql(sql)
 
@@ -1135,14 +1237,25 @@ class pyBIVAS:
 
         # If not returning here, it will crash
         if df.shape[0] == 0:
-            return df
+            return None
 
-        if per_direction:
-            df = df.pivot(columns='Vaarrichting')
+        if pivot is not None:
+            df = df.pivot(columns=pivot)
             df.rename(mapper=self.directions_dutch, inplace=True, axis=1)
-        df = df['nTrips']
+
+        df = df[param]
+
+        # df = df.replace({0: np.nan}) add his to also exclude all empty vessels when processing vracht
+
+        if pivot == 'Scheepvaartklasse':
+            ordered_columns = self.shiptypes()['Label']
+            df = df.reindex(ordered_columns, axis=1).dropna(how='all', axis=1)
+        elif pivot == 'CEMT-klasse':
+            ordered_columns = self.CEMTclass()['Description']
+            df = df.reindex(ordered_columns, axis=1).dropna(how='all', axis=1)
+
         fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
-        df = df.reindex(fullyear, fill_value=0)
+        df = df.reindex(fullyear, fill_value=0).fillna(0)
         return df
 
     def countingpoint_CEMT_klasse(self, referenceSetId, countingPointName, trafficScenarioId):
