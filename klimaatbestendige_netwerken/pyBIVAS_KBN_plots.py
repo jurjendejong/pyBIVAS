@@ -19,10 +19,11 @@ class scenarios:
 
     scenarios_Q_reverse = scenarios_Q[::-1]
 
-    scenarios_Q_incl_WHO = scenarios_Q + [f'{s}_WLO2050H' for s in scenarios_Q] + ['Q1020_WLO2050L']
+    scenarios_Q_incl_WHO = scenarios_Q + [f'{s}_WLO2050H' for s in scenarios_Q] + ['Q1020_WLO2050L', 'Q1020_B2050']
 
     Qref = 'Q1800'
     Qref_vracht = 'Q700'
+
 
 class mapping:
     # Load mappings
@@ -51,56 +52,63 @@ class mapping:
     )
 
 
+def add_columns(df):
+    if 'Origin_Node' in df:
+        df['Origin_Country'] = mapping.mapping_node_zone.reindex(df['Origin_Node'])['Country'].values
+        df['Destination_Country'] = mapping.mapping_node_zone.reindex(df['Destination_Node'])['Country'].values
+    else:
+        df['Origin_Country'] = mapping.mapping_node_zone.reindex(df['OriginTripEndPointNodeID'])['Country'].values
+        df['Destination_Country'] = mapping.mapping_node_zone.reindex(df['DestinationTripEndPointNodeID'])[
+            'Country'].values
+
+        df['Origin_Zone'] = mapping.mapping_node_zone.reindex(df['OriginTripEndPointNodeID'])['BasGoed2018'].values
+        df['Destination_Zone'] = mapping.mapping_node_zone.reindex(df['DestinationTripEndPointNodeID'])[
+            'BasGoed2018'].values
+
+    df['Vervoerstromen'] = None
+    df.loc[(df['Origin_Country'] == mapping.nl) & (
+            df['Destination_Country'] == mapping.nl), 'Vervoerstromen'] = 'Binnenlands'
+    df.loc[
+        (df['Origin_Country'] != mapping.nl) & (df['Destination_Country'] == mapping.nl), 'Vervoerstromen'] = 'Aanvoer'
+    df.loc[
+        (df['Origin_Country'] == mapping.nl) & (df['Destination_Country'] != mapping.nl), 'Vervoerstromen'] = 'Afvoer'
+    df.loc[
+        (df['Origin_Country'] != mapping.nl) & (df['Destination_Country'] != mapping.nl), 'Vervoerstromen'] = 'Doorvoer'
+
+    df['Origin_Corridor'] = mapping.basgoed2018_corridor.loc[df['Origin_Zone'].values]['Corridors'].values
+    df['Destination_Corridor'] = mapping.basgoed2018_corridor.loc[df['Destination_Zone'].values]['Corridors'].values
+
+    df['Origin_ZoneNLorCountry'] = df['Origin_Zone']
+    buitenland = df['Origin_Country'] != mapping.nl
+    df.loc[buitenland, 'Origin_ZoneNLorCountry'] = df['Origin_Country'][buitenland]
+
+    df['Destination_ZoneNLorCountry'] = df['Destination_Zone']
+    buitenland = df['Destination_Country'] != mapping.nl
+    df.loc[buitenland, 'Destination_ZoneNLorCountry'] = df['Destination_Country'][buitenland]
+
+    df = df.drop('Days', axis=1, errors='ignore')
+
+    df = df.rename(columns={
+        'appearance_types_Description': 'Vorm',
+        'DateTime': 'Days',
+    })
+
+    return df
+
+
+def function_drop_infeasible(df, scenario):
+    infeasible_index = pd.read_pickle(inputdir / '..' / 'Infeasible trips/All infeasible.pkl')
+    infeasible_index_Q = infeasible_index[scenario][infeasible_index[scenario]].index
+    df = df.drop(infeasible_index_Q, axis=0, errors='ignore')
+    return df
+
+
 def read_scenarios(file, scenarios, addcolumns=True, dropinfeasible=True, increaseemptytrips=True, keep_columns=None):
-    def add_columns(df):
-        if 'Origin_Node' in df:
-            df['Origin_Country'] = mapping.mapping_node_zone.reindex(df['Origin_Node'])['Country'].values
-            df['Destination_Country'] = mapping.mapping_node_zone.reindex(df['Destination_Node'])['Country'].values
-        else:
-            df['Origin_Country'] = mapping.mapping_node_zone.reindex(df['OriginTripEndPointNodeID'])['Country'].values
-            df['Destination_Country'] = mapping.mapping_node_zone.reindex(df['DestinationTripEndPointNodeID'])['Country'].values
-
-            df['Origin_Zone'] = mapping.mapping_node_zone.reindex(df['OriginTripEndPointNodeID'])['BasGoed2018'].values
-            df['Destination_Zone'] = mapping.mapping_node_zone.reindex(df['DestinationTripEndPointNodeID'])[
-                'BasGoed2018'].values
-
-        df['Vervoerstromen'] = None
-        df.loc[(df['Origin_Country'] == mapping.nl) & (df['Destination_Country'] == mapping.nl), 'Vervoerstromen'] = 'Binnenlands'
-        df.loc[(df['Origin_Country'] != mapping.nl) & (df['Destination_Country'] == mapping.nl), 'Vervoerstromen'] = 'Aanvoer'
-        df.loc[(df['Origin_Country'] == mapping.nl) & (df['Destination_Country'] != mapping.nl), 'Vervoerstromen'] = 'Afvoer'
-        df.loc[(df['Origin_Country'] != mapping.nl) & (df['Destination_Country'] != mapping.nl), 'Vervoerstromen'] = 'Doorvoer'
-
-        df['Origin_Corridor'] = mapping.basgoed2018_corridor.loc[df['Origin_Zone'].values]['Corridors'].values
-        df['Destination_Corridor'] = mapping.basgoed2018_corridor.loc[df['Destination_Zone'].values]['Corridors'].values
-
-        df['Origin_ZoneNLorCountry'] = df['Origin_Zone']
-        buitenland = df['Origin_Country'] != mapping.nl
-        df.loc[buitenland, 'Origin_ZoneNLorCountry'] = df['Origin_Country'][buitenland]
-
-        df['Destination_ZoneNLorCountry'] = df['Destination_Zone']
-        buitenland = df['Destination_Country'] != mapping.nl
-        df.loc[buitenland, 'Destination_ZoneNLorCountry'] = df['Destination_Country'][buitenland]
-
-        df = df.drop('Days', axis=1, errors='ignore')
-
-        df = df.rename(columns={
-            'appearance_types_Description': 'Vorm',
-            'DateTime': 'Days',
-        })
-
-        return df
-
-    def function_drop_infeasible(df, scenario):
-        infeasible_index = pd.read_pickle('Infeasible trips/All infeasible.pkl')
-        infeasible_index_Q = infeasible_index[scenario][infeasible_index[scenario]].index
-        df = df.drop(infeasible_index_Q, axis=0, errors='ignore')
-        return df
-
     from klimaatbestendige_netwerken.pyBIVAS_data_postprocessing import increase_empty_trips
 
     D = {}
     for s in scenarios:
-        print('Loading', s)
+        print('Loading', file, s)
         df = pd.read_pickle(inputdir / s / file)
 
         if addcolumns:
@@ -119,6 +127,7 @@ def read_scenarios(file, scenarios, addcolumns=True, dropinfeasible=True, increa
     D = pd.concat(D, axis=1)
     D = D[scenarios]
     return D
+
 
 ## Plotting functions
 
@@ -198,7 +207,8 @@ def vaarweg_plot_beladingsgraad(D, branchname='', figuredir=Path('.')):
 
 
 def plot_groupby_ship_types(D, figuredir=Path('.')):
-    ships_with_largest_tonkm = D[scenarios.Qref].groupby(['ship_types_Label'])['Totale TonKM (TONKM)'].sum().sort_values(
+    ships_with_largest_tonkm = D[scenarios.Qref].groupby(['ship_types_Label'])[
+                                   'Totale TonKM (TONKM)'].sum().sort_values(
         ascending=False).index[:20]
 
     plotdata = {}
@@ -230,7 +240,8 @@ def plot_groupby_ship_types(D, figuredir=Path('.')):
 
 
 def plot_groupby_ship_types_eurtonkm(D, figuredir=Path('.')):
-    ships_with_largest_tonkm = D[scenarios.Qref].groupby(['ship_types_Label'])['Totale TonKM (TONKM)'].sum().sort_values(
+    ships_with_largest_tonkm = D[scenarios.Qref].groupby(['ship_types_Label'])[
+                                   'Totale TonKM (TONKM)'].sum().sort_values(
         ascending=False).index[:20]
 
     plotdata = {}
@@ -260,7 +271,8 @@ def plot_groupby_ship_types_eurtonkm(D, figuredir=Path('.')):
 
 
 def plot_groupby_ship_types_vracht(D, figuredir=Path('.')):
-    ships_with_largest_tonkm = D[scenarios.Qref].groupby(['ship_types_Label'])['Totale TonKM (TONKM)'].sum().sort_values(
+    ships_with_largest_tonkm = D[scenarios.Qref].groupby(['ship_types_Label'])[
+                                   'Totale TonKM (TONKM)'].sum().sort_values(
         ascending=False).index[:20]
 
     plotdata = {}
@@ -319,6 +331,7 @@ def plot_groupby_vorm(D, yvariable='Totale Variabele Vaarkosten (EUR)', figuredi
         plotdata.to_csv(figuredir / 'Vaarbewegingen_per_vorm.csv')
         plt.savefig(figuredir / 'Vaarbewegingen_per_vorm.png', dpi=300, bbox_inches='tight')
     plt.close()
+    return plotdata
 
 
 def plot_groupby_vorm_vracht(D, figuredir=Path('.')):
@@ -401,7 +414,8 @@ def plot_groupby_NSTR_vracht(D, figuredir=Path('.')):
 def plot_vaarkostenpertonkm(D, figuredir=Path('.')):
     x = D[scenarios.Qref]['Depth__m']
     y = (
-        D[scenarios.Qref][['Totale Vaarkosten (EUR)', 'Totale Vaste Vaarkosten (EUR)', 'Totale Variabele Vaarkosten (EUR)']]).div(
+        D[scenarios.Qref][
+            ['Totale Vaarkosten (EUR)', 'Totale Vaste Vaarkosten (EUR)', 'Totale Variabele Vaarkosten (EUR)']]).div(
         D[scenarios.Qref]['Totale TonKM (TONKM)'], axis=0)  # / D['REF']['Totale Vaarkosten (EUR)']
 
     # Selectie van diepgang (1 - 4 m) en geen nan, en maximale kosten 0.1 eur/tonkm
@@ -412,7 +426,8 @@ def plot_vaarkostenpertonkm(D, figuredir=Path('.')):
     bins = np.linspace(1 - 1 / 8, 4 + 1 / 8, int((4 - 1) / 0.25 + 2))
     r = groupby(x, y, bins=bins).swaplevel(axis=1)['50%']
 
-    y2 = D[scenarios.scenarios_Q].xs('Totale Vaarkosten (EUR)', axis=1, level=1).div(D[scenarios.Qref]['Totale TonKM (TONKM)'], axis=0)
+    y2 = D[scenarios.scenarios_Q].xs('Totale Vaarkosten (EUR)', axis=1, level=1).div(
+        D[scenarios.Qref]['Totale TonKM (TONKM)'], axis=0)
     y2 = diff_Q(y2)[ii]
 
     r2 = groupby(x, y2, bins=bins)
@@ -461,7 +476,7 @@ def plot_timeseries(D, figuredir=Path('.')):
     plt.close()
 
 
-def plot_basgoed(D, t, figuredir=Path('.')):
+def plot_basgoed(D, t, figuredir=Path('.'), apply_sorting=True):
     T_dict = {'Origin': "Herkomst", 'Destination': 'Bestemming'}
     T = T_dict[t]
 
@@ -476,11 +491,33 @@ def plot_basgoed(D, t, figuredir=Path('.')):
     plotdata = plotdata / 1e6
 
     # Toevoegen vaste vaarkosten
-    vast = D[scenarios.Qref][D[scenarios.Qref][f'{t}_Country'] == mapping.nl].groupby(f'{t}_Zone')['Totale Vaste Vaarkosten (EUR)'].sum() / 1e6
+    vast = D[scenarios.Qref][D[scenarios.Qref][f'{t}_Country'] == mapping.nl].groupby(f'{t}_Zone')[
+               'Totale Vaste Vaarkosten (EUR)'].sum() / 1e6
     plotdata.insert(0, 'Vaste kosten', vast)
     plotdata[scenarios.Qref] = plotdata[scenarios.Qref] - vast
 
+    # Sortering
+    if apply_sorting is True:
+        # Get sorting by corridor-name
+        sorting = mapping.basgoed2018_corridor[(mapping.basgoed2018_corridor['Country'] == 'NL - Netherlands')]
+        sorting = sorting.sort_index().reset_index().sort_values(['Corridors', 'Name']).set_index('Name')
+
+        # Apply sorting and add column
+        plotdata = plotdata.reindex(sorting.index, axis=0).dropna(how='all')
+        plotdata['Corridors'] = sorting.reindex(plotdata.index)['Corridors']
+
+        # Find locations where corridor changes
+        change_in_corridors = np.where([plotdata['Corridors'].iloc[ii] != plotdata['Corridors'].iloc[ii + 1]
+                                        for ii in range(plotdata['Corridors'].shape[0] - 1)])[0]
+
+        plotdata = plotdata.drop('Corridors', axis=1)
+
     plotdata.plot.bar(width=0.8, figsize=(12, 4), zorder=3, stacked=True, cmap='viridis', edgecolor='w', linewidth=0.3)
+
+    if apply_sorting is True:
+        # Plot changes as vertical lines
+        [plt.axvline(ii + 0.5, lw=2, ls=':', c='xkcd:lightblue') for ii in change_in_corridors]
+
     plt.ylabel('Vaarkosten (mln EUR)')
     plt.xlabel('')
     plt.grid()
@@ -490,9 +527,10 @@ def plot_basgoed(D, t, figuredir=Path('.')):
     plotdata.to_csv(figuredir / f'Toename vaarkosten per {T}.csv')
     plt.savefig(figuredir / f'Toename vaarkosten per {T}.png', bbox_inches='tight', dpi=300)
     plt.close()
+    return plotdata
 
 
-def plot_basgoed_vracht(D, t, figuredir=Path('.')):
+def plot_basgoed_vracht(D, t, figuredir=Path('.'), apply_sorting=True):
     T_dict = {'Origin': "Herkomst", 'Destination': 'Bestemming'}
     T = T_dict[t]
 
@@ -504,7 +542,30 @@ def plot_basgoed_vracht(D, t, figuredir=Path('.')):
 
     plotdata = diff_Q_decreasing(D_zone)
     plotdata = plotdata / 1e6
+
+
+    # Sortering
+    if apply_sorting is True:
+        # Get sorting by corridor-name
+        sorting = mapping.basgoed2018_corridor[(mapping.basgoed2018_corridor['Country'] == 'NL - Netherlands')]
+        sorting = sorting.sort_index().reset_index().sort_values(['Corridors', 'Name']).set_index('Name')
+
+        # Apply sorting and add column
+        plotdata = plotdata.reindex(sorting.index, axis=0).dropna(how='all')
+        plotdata['Corridors'] = sorting.reindex(plotdata.index)['Corridors']
+
+        # Find locations where corridor changes
+        change_in_corridors = np.where([plotdata['Corridors'].iloc[ii] != plotdata['Corridors'].iloc[ii + 1]
+                                        for ii in range(plotdata['Corridors'].shape[0] - 1)])[0]
+
+        plotdata = plotdata.drop('Corridors', axis=1)
+
     plotdata.plot.bar(width=0.8, figsize=(12, 4), zorder=3, stacked=True, cmap='plasma', edgecolor='w', linewidth=0.3)
+
+    if apply_sorting is True:
+        # Plot changes as vertical lines
+        [plt.axvline(ii + 0.5, lw=2, ls=':', c='xkcd:lightblue') for ii in change_in_corridors]
+
     plt.ylabel('Vracht (mln ton)')
     plt.xlabel('')
     plt.grid()
@@ -529,6 +590,7 @@ def plot_country(D, t, figuredir=Path('.')):
     plotdata = diff_Q(D_zone)
 
     # Toevoegen vaste vaarkosten
+    # TODO: This assumes that the vaste vaarkosten stay constant!!!! ADjust
     vast = D[scenarios.Qref].groupby(f'{t}_Country')['Totale Vaste Vaarkosten (EUR)'].sum()
     plotdata.insert(0, 'Vaste kosten', vast)
     #     plotdata[Qref] = plotdata[Qref] - vast
@@ -618,6 +680,7 @@ def plot_corridor(D, figuredir=Path('.')):
 
     cc = ['Totale Vaarkosten (EUR)', 'Totale TonKM (TONKM)', 'Totale Reistijd (min)', 'Totale Vracht (ton)',
           'Totale TEU (-)', 'Aantal Vaarbewegingen (-)']
+    highest = [True, True, True, False, False, True]
 
     DD = {}
     for s in D.columns.levels[0]:
@@ -628,16 +691,20 @@ def plot_corridor(D, figuredir=Path('.')):
     for c in cc:
 
         plotdata = DD[(scenarios.Qref, c)]
-        plotdata = plotdata[mapping.corridor_volgorde].loc[mapping.corridor_volgorde]
-        if plotdata.max().max() > 1e6:
+        plotdata = plotdata[mapping.corridor_volgorde].reindex(mapping.corridor_volgorde, axis=0)
+        if (plotdata.max().max() > 1e6) or (plotdata.min().min() < -1e6):
             plotdata = plotdata / 1e6
             c = c.replace('(', '(mln ')
-        elif plotdata.max().max() > 1e3:
+        elif (plotdata.max().max() > 1e3) or (plotdata.min().min() < -1e3):
             plotdata = plotdata / 1e3
             c = c.replace('(', '(x1000 ')
+        if plotdata.abs().max().max() > 100:
+            format = '.0f'
+        else:
+            format = '.1f'
 
         f, ax = plt.subplots(figsize=(8, 7))
-        sns.heatmap(plotdata.T, cmap='Blues', annot=True, fmt='.0f', ax=ax, norm=SymLogNorm(1), cbar=False)
+        sns.heatmap(plotdata.T, cmap='Blues', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False)
         plt.xlabel('Herkomst')
         plt.ylabel('Bestemming')
         plt.axhline(7, color='k', lw=1)
@@ -648,18 +715,26 @@ def plot_corridor(D, figuredir=Path('.')):
         plt.close()
 
     for Q in scenarios.scenarios_Q[:-1]:
-        for c in cc:
+        for c, ascending in zip(cc, highest):
             plotdata = DD[(Q, c)] - DD[(scenarios.Qref, c)]
-            plotdata = plotdata[mapping.corridor_volgorde].loc[mapping.corridor_volgorde]
-            if plotdata.max().max() > 1e6:
+            plotdata = plotdata[mapping.corridor_volgorde].reindex(mapping.corridor_volgorde, axis=0)
+            if (plotdata.max().max() > 1e6) or (plotdata.min().min() < -1e6) :
                 plotdata = plotdata / 1e6
                 c = c.replace('(', '(mln ')
-            elif plotdata.max().max() > 1e3:
+            elif (plotdata.max().max() > 1e3) or (plotdata.min().min() < -1e3):
                 plotdata = plotdata / 1e3
                 c = c.replace('(', '(x1000 ')
+            if plotdata.abs().max().max() > 100:
+                format = '.0f'
+            else:
+                format = '.1f'
 
             f, ax = plt.subplots(figsize=(8, 7))
-            sns.heatmap(plotdata.T, cmap='Reds', annot=True, fmt='.0f', ax=ax, norm=SymLogNorm(1), cbar=False)
+
+            if ascending:
+                sns.heatmap(plotdata.T, cmap='Reds', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmin=0)
+            else:
+                sns.heatmap(plotdata.T, cmap='Reds_r', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmax=0)
             plt.xlabel('Herkomst')
             plt.ylabel('Bestemming')
             plt.axhline(7, color='k', lw=1)
@@ -675,7 +750,9 @@ def plot_corridor_zones(D, figuredir=Path('.')):
     heatmapdir.mkdir(exist_ok=True)
 
     cc = ['Totale Vaarkosten (EUR)', 'Totale TonKM (TONKM)', 'Totale Reistijd (min)', 'Totale Vracht (ton)',
-          'Totale TEU (-)']
+          'Totale TEU (-)', 'Aantal Vaarbewegingen (-)']
+
+    highest = [True, True, True, False, False, True]
 
     DD = {}
     for s in D.columns.levels[0]:
@@ -683,31 +760,35 @@ def plot_corridor_zones(D, figuredir=Path('.')):
         DD[s] = DD[s].unstack().fillna(value=0)
     DD = pd.concat(DD, axis=1)
 
-    def plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Blues'):
-        if plotdata.max().max() > 10e9:
-            plotdata = plotdata / 1e9
-            c = c.replace('(', '(mld ')
-        elif plotdata.max().max() > 1e6:
+
+    def plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Blues', vmin=None, vmax=None):
+        if (plotdata.max().max() > 1e6) or (plotdata.min().min() < -1e6):
             plotdata = plotdata / 1e6
             c = c.replace('(', '(mln ')
-        elif plotdata.max().max() > 1e3:
+        elif (plotdata.max().max() > 1e3) or (plotdata.min().min() < -1e3):
             plotdata = plotdata / 1e3
             c = c.replace('(', '(x1000 ')
+        if plotdata.abs().max().max() > 100:
+            format = '.0f'
+        else:
+            format = '.1f'
 
         f, ax = plt.subplots(figsize=figsize)
-        sns.heatmap(plotdata.T, cmap=cmap, annot=True, fmt='.0f', ax=ax, norm=SymLogNorm(1), cbar=False)
+        sns.heatmap(plotdata.T, cmap=cmap, annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmin=vmin, vmax=vmax)
         plt.xlabel('Herkomst')
         plt.ylabel('Bestemming')
         plt.title(c)
 
-    for c in cc:
+    for c, ascending in zip(cc, highest):
 
         plotdata = DD[(scenarios.Qref, c)]
-        plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde, columns=mapping.basgoedzone_country_volgorde,
+        plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde,
+                                    columns=mapping.basgoedzone_country_volgorde,
                                     fill_value=0)
+
         plotdata = plotdata.loc[
-            plotdata.sum(axis=1) > plotdata.sum(axis=1).sort_values().iloc[-30], plotdata.sum(axis=0) >
-            plotdata.sum(axis=0).sort_values().iloc[-30]]
+            plotdata.sum(axis=1) > plotdata.sum(axis=1).sort_values().iloc[-30],
+            plotdata.sum(axis=0) > plotdata.sum(axis=0).sort_values().iloc[-30]]
 
         plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Blues')
         plotdata.to_csv(heatmapdir / f'Heatmap_zones_{c}.csv')
@@ -715,7 +796,8 @@ def plot_corridor_zones(D, figuredir=Path('.')):
         plt.close()
 
         plotdata = DD[(scenarios.Qref, c)]
-        plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde, columns=mapping.basgoedzone_country_volgorde,
+        plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde,
+                                    columns=mapping.basgoedzone_country_volgorde,
                                     fill_value=0)
         plotdata = plotdata.loc[plotdata.sum(axis=1) > 0, plotdata.sum(axis=0) > 0]
 
@@ -725,24 +807,39 @@ def plot_corridor_zones(D, figuredir=Path('.')):
         plt.close()
 
         for Q in scenarios.scenarios_Q[:-1]:
+            # Make plot of the top 30 zones
             plotdata = DD[(Q, c)] - DD[(scenarios.Qref, c)]
-            plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde, columns=mapping.basgoedzone_country_volgorde,
+            plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde,
+                                        columns=mapping.basgoedzone_country_volgorde,
                                         fill_value=0)
-            plotdata = plotdata.loc[
-                plotdata.sum(axis=1) > plotdata.sum(axis=1).sort_values().iloc[-30], plotdata.sum(axis=0) >
-                plotdata.sum(axis=0).sort_values().iloc[-30]]
 
-            plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds')
+            if ascending:
+                plotdata = plotdata.loc[
+                    plotdata.sum(axis=1) > plotdata.sum(axis=1).sort_values().iloc[-30],
+                    plotdata.sum(axis=0) > plotdata.sum(axis=0).sort_values().iloc[-30]]
+                plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds', vmin=0)
+            else:
+                plotdata = plotdata.loc[
+                    plotdata.sum(axis=1) < plotdata.sum(axis=1).sort_values(ascending=False).iloc[-30],
+                    plotdata.sum(axis=0) < plotdata.sum(axis=0).sort_values(ascending=False).iloc[-30]]
+                plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds_r', vmax=0)
+
             plotdata.to_csv(heatmapdir / f'Heatmap_zones_change_{Q}_{c}.csv')
             plt.savefig(heatmapdir / f'Heatmap_zones_change_{Q}_{c}.png', dpi=300, bbox_inches='tight')
             plt.close()
 
+            # Make plot of all non-zero zones
             plotdata = DD[(Q, c)] - DD[(scenarios.Qref, c)]
-            plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde, columns=mapping.basgoedzone_country_volgorde,
+            plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde,
+                                        columns=mapping.basgoedzone_country_volgorde,
                                         fill_value=0)
-            plotdata = plotdata.loc[plotdata.sum(axis=1) > 0, plotdata.sum(axis=0) > 0]
+            if ascending:
+                plotdata = plotdata.loc[plotdata.sum(axis=1) != 0, plotdata.sum(axis=0) != 0]
+                plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds', vmin=0)
+            else:
+                plotdata = plotdata.loc[plotdata.sum(axis=1) != 0, plotdata.sum(axis=0) != 0]
+                plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds_r', vmax=0)
 
-            plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds')
             plotdata.to_csv(heatmapdir / f'Heatmap_zonesL_change_{Q}_{c}.csv')
             plt.savefig(heatmapdir / f'Heatmap_zonesL_change_{Q}_{c}.png', dpi=300, bbox_inches='tight')
             plt.close()
