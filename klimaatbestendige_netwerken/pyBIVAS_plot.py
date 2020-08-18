@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -33,7 +34,8 @@ class pyBIVAS_plot(pyBIVAS):
         'Lek': 6717,
         'IJssel': 6510,
         'Zuid-Willemsvaart': 9130,
-        'Zandmaas': 7523,
+        'Maas (Oost-West)': 7523,
+        'Maasroute': 9166,
         'Julianakanaal': 8710,
         'Schelde-Rijnkanaal': 8387,
         'Betuwepand (ARK)': 6853,
@@ -536,7 +538,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
 
     # Jaarlijkse variatie
-    def plot_countingpoint_timeseries(self, telpunt='Prins Bernhardsluis', jaar=2018):
+    def plot_countingpoint_timeseries(self, telpunt='Prins Bernhardsluis', jaar=2018, param="Aantal Vaarbewegingen (-)"):
         figdir = self.outputdir / 'figures_CountingPointsForYear'
         if not figdir.exists():
             figdir.mkdir()
@@ -549,20 +551,121 @@ class IVS90_analyse(pyBIVAS_plot):
         countingPointName = telpunt
 
         # Query data
-        df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId)
+        df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, param=param)
         if not len(df):
             return 'No data'
 
         # Plot data
-        df.plot(kind='area', stacked=True, figsize=(16, 6), )
+
+        if param == "Aantal Vaarbewegingen (-)":
+            df.plot(kind='area', stacked=True, figsize=(16, 6), )
+        elif param == "Totale Vracht (ton)":
+            df.plot(kind='area', stacked=True, figsize=(16, 6), color=['C2', 'C3'])
+
         plt.title('{} - {}'.format(telpunt, jaar))
         plt.grid()
-        plt.ylabel('Aantal passages')
 
-        plt.savefig(figdir / 'Tijdserie_{}_{}.png'.format(telpunt, jaar), dpi=300)
-        df.to_csv(figdir / 'Tijdserie_{}_{}.csv'.format(telpunt, jaar))
+        if param == "Aantal Vaarbewegingen (-)":
+            plt.ylabel('Aantal passages')
+
+            plt.savefig(figdir / 'Tijdserie_{}_{}.png'.format(telpunt, jaar), dpi=300)
+            df.to_csv(figdir / 'Tijdserie_{}_{}.csv'.format(telpunt, jaar))
+
+        elif param == "Totale Vracht (ton)":
+            plt.ylabel("Totale Vracht (ton)")
+
+            plt.savefig(figdir / 'TijdserieVracht_{}_{}.png'.format(telpunt, jaar), dpi=300)
+            df.to_csv(figdir / 'TijdserieVracht_{}_{}.csv'.format(telpunt, jaar))
 
         plt.close()
+
+    # Jaarlijkse variatie
+    def plot_countingpoint_timeseries_weekly(self, telpunt='Prins Bernhardsluis', jaar=2018,
+                                             param="Aantal Vaarbewegingen (-)", opdeling='Vaarrichting',
+                                             relatief: Optional[tuple] = None):
+        """
+
+
+        :param telpunt:
+        :param jaar:
+        :param param:
+        :param opdeling: None, "Vaarrichting", "Bestemming", "Herkomst", "Scheepvaartklasse", "CEMT-klasse"
+        :param relatief:
+        :return:
+        """
+
+        # Extend query with zones instead of vaarrichting
+        figdir = self.outputdir / 'figures_CountingPointsPerWeek'
+        if not figdir.exists():
+            figdir.mkdir()
+
+        logger.info(f'Plotting CountingPointsForYear voor telpunt: {telpunt}, jaar: {jaar} ({param}, {opdeling}, {relatief})')
+
+        # Set variables
+        referenceSetId = self.traffic_scenarios.loc[jaar, 'reference_trips_sets_id']
+        trafficScenarioId = self.traffic_scenarios.loc[jaar, 'ID']
+        countingPointName = telpunt
+
+        # Query data
+        df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, param=param,
+                                           pivot=opdeling)
+        if df is None:
+            return 'No data'
+
+        postfix = ''
+        if relatief is not None:
+            reference_period = df[relatief[0]:relatief[1]].sum(axis=1).mean(axis=0)
+            df = df.divide(reference_period, axis='columns')
+            postfix = '_rel'
+
+        df = df.resample('W').mean()
+        df.index = pd.Int64Index(df.index.isocalendar().week)
+
+        if np.isin(opdeling, ['Herkomst', 'Bestemming', 'Scheepvaartklasse', 'CEMT-klasse']):
+            df_uncompressed = df.copy()
+            if df.shape[1] > 20:
+                # Only select top 19 + Overig
+                sorted_opdeling = df_uncompressed.sum().sort_values(ascending=False)
+                # df = df_uncompressed.loc[:, sorted_opdeling.index[:19]]
+                df = df_uncompressed.drop(sorted_opdeling.index[19:], axis=1)
+                df.loc[:, 'Overig'] = df_uncompressed.loc[:, sorted_opdeling.index[19:]].sum(axis=1)
+
+                # # Only select regions larger than 1%
+                # aandeel_per_zone = (df.sum() / df.sum().sum())
+                # df2 = df.loc[:, aandeel_per_zone >= 0.01].copy()
+                # df2.loc[:, 'Overig'] = df.loc[:, aandeel_per_zone < 0.01].sum(axis=1)
+
+        # Make stacked barplot
+        bars = df.plot.bar(stacked=True, figsize=(10, 4), zorder=3, width=0.85, cmap='tab20', linewidth=0)
+
+        if np.isin(opdeling, ['Herkomst', 'Bestemming', 'Scheepvaartklasse', 'CEMT-klasse']):
+            if 'Overig' in df.columns:
+                for ii, bar in enumerate(bars.patches):
+                    if (ii // df.shape[0]) == (df.shape[1] -1):
+                        bar.set_hatch('\\\\\\\\', )
+                        bar.set_edgecolor([0.5, 0.5, 0.5])
+
+        plt.title('{} - {}'.format(telpunt, jaar))
+        plt.grid()
+
+        param_name = param.split(' (')[0]
+        plt.xlabel(f'Weeknummer')
+
+        if relatief is None:
+            plt.ylabel(param + ' per dag')
+        else:
+            plt.ylabel(param_name + ' per dag (relatief)')
+
+        if np.isin(opdeling, ['Herkomst', 'Bestemming', 'Scheepvaartklasse', 'CEMT-klasse']):
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=4, title=opdeling)
+            plt.savefig(figdir / 'Tijdserie_{}_{}_{}_{}{}.png'.format(telpunt, jaar, param_name, opdeling, postfix), dpi=300, bbox_inches='tight')
+            df_uncompressed.to_csv(figdir / 'Tijdserie_{}_{}_{}_{}{}.csv'.format(telpunt, jaar, param_name, opdeling, postfix))
+        else:
+            plt.savefig(figdir / 'Tijdserie_{}_{}_{}_{}{}.png'.format(telpunt, jaar, param_name, opdeling, postfix),
+                        dpi=300)
+            df.to_csv(figdir / 'Tijdserie_{}_{}_{}_{}{}.csv'.format(telpunt, jaar, param_name, opdeling, postfix))
+        plt.close()
+
 
     def plot_countingpoint_piechart_CEMTclasses(self, telpunt='Prins Bernhardsluis', jaar=2018):
         """
@@ -615,7 +718,7 @@ class IVS90_analyse(pyBIVAS_plot):
             countingPointName = telpunt
 
             # Query data
-            df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, per_direction=False)
+            df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, pivot=None)
 
             if not len(df):
                 continue
@@ -769,6 +872,7 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('Aantal schepen')
         plt.ylim(bottom=0)
 
+        zone_name = zone_name.replace('/', '-')
         plt.savefig(figdir / f'TijdserieZone_{zone_name}_{jaar}.png', dpi=300, bbox_inches='tight')
         df.to_csv(figdir / f'TijdserieZone_{zone_name}_{jaar}.csv')
 
@@ -833,6 +937,8 @@ class IVS90_analyse(pyBIVAS_plot):
         plt.ylabel('')
         plt.title(f'Scheepvaart van en naar: {label}')
 
+
+
         if NodeID is not None:
             plt.savefig(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.png', dpi=300, bbox_inches='tight')
             df.to_csv(figdir / f'PiechartNode_{NodeID}_{label}_{groupby}_{jaar}.csv', header=False)
@@ -851,7 +957,18 @@ class IVS90_analyse(pyBIVAS_plot):
         #
         # for c in countingPoints['Name']:
         #     for y in self.traffic_scenarios.index:
-        #         self.plot_countingpoint_timeseries(c, y)
+        #         # self.plot_countingpoint_timeseries(c, y)
+        #         self.plot_countingpoint_timeseries(c, y, param="Totale Vracht (ton)")
+
+
+        for c in countingPoints['Name']:
+            for y in self.traffic_scenarios.index:
+                for param in ['Aantal Vaarbewegingen (-)', "Totale Vracht (ton)"]:
+                    for opdeling in ['Scheepvaartklasse', 'CEMT-klasse', 'Bestemming', 'Herkomst', None]:  # , 'Vaarrichting'
+                        for relatief in [None]:  # , ('2018-03-07', '2018-06-15')
+                            self.plot_countingpoint_timeseries_weekly(c, y, param=param, opdeling=opdeling, relatief=relatief)
+
+
         #
         # for c in countingPoints['Name']:
         #     for y in self.traffic_scenarios.index:
@@ -870,10 +987,10 @@ class IVS90_analyse(pyBIVAS_plot):
         #     for y in years:
         #         self.plot_zone_timeseries(jaar=y, zone_name=z)
 
-        for z in zones:
-            for y in years:
-                self.plot_nodezone_piechart(groupby='NSTR', jaar=y, zone_name=z)
-                self.plot_nodezone_piechart(groupby='ship_types', jaar=y, zone_name=z)
+        # for z in zones:
+        #     for y in years:
+        #         self.plot_nodezone_piechart(groupby='NSTR', jaar=y, zone_name=z)
+        #         self.plot_nodezone_piechart(groupby='ship_types', jaar=y, zone_name=z)
         #
         # for n in nodes:
         #     for y in years:
