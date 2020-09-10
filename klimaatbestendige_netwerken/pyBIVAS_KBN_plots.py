@@ -118,7 +118,7 @@ def read_scenarios(file, scenarios, addcolumns=True, dropinfeasible=True, increa
             df = function_drop_infeasible(df, s)
 
         if increaseemptytrips:
-            increase_empty_trips.adjust_trips_lege_schepen(df, s)
+            df = increase_empty_trips.adjust_trips_lege_schepen(df, s)
 
         if keep_columns is not None:
             df = df[keep_columns]
@@ -680,7 +680,10 @@ def plot_corridor(D, figuredir=Path('.')):
 
     cc = ['Totale Vaarkosten (EUR)', 'Totale TonKM (TONKM)', 'Totale Reistijd (min)', 'Totale Vracht (ton)',
           'Totale TEU (-)', 'Aantal Vaarbewegingen (-)']
-    highest = [True, True, True, False, False, True]
+
+    ascending = [True, True, True, False, False, True]
+    unit_plots = ['mln', 'mln', 'mln', 'mln', '1000', '1000']
+    unit_diff_plots = ['mln', 'mln', 'mln', '1000', '1000', '1000']
 
     DD = {}
     for s in D.columns.levels[0]:
@@ -688,14 +691,14 @@ def plot_corridor(D, figuredir=Path('.')):
         DD[s] = DD[s].unstack().fillna(value=0)
     DD = pd.concat(DD, axis=1)
 
-    for c in cc:
+    for ii, c in enumerate(cc):
 
         plotdata = DD[(scenarios.Qref, c)]
         plotdata = plotdata[mapping.corridor_volgorde].reindex(mapping.corridor_volgorde, axis=0)
-        if (plotdata.max().max() > 1e6) or (plotdata.min().min() < -1e6):
+        if unit_plots[ii] == 'mln':
             plotdata = plotdata / 1e6
             c = c.replace('(', '(mln ')
-        elif (plotdata.max().max() > 1e3) or (plotdata.min().min() < -1e3):
+        elif unit_plots[ii] == '1000':
             plotdata = plotdata / 1e3
             c = c.replace('(', '(x1000 ')
         if plotdata.abs().max().max() > 100:
@@ -709,19 +712,22 @@ def plot_corridor(D, figuredir=Path('.')):
         plt.ylabel('Bestemming')
         plt.axhline(7, color='k', lw=1)
         plt.axvline(7, color='k', lw=1)
-        plt.title(c)
+        plt.title(f'{c} - {scenarios.Qref}')
         plotdata.to_csv(heatmapdir / f'Heatmap_{c}.csv')
         plt.savefig(heatmapdir / f'Heatmap_{c}.png', dpi=300, bbox_inches='tight')
         plt.close()
 
+    # Get maximum in first loop
+    v_maximums = {}
+    v_minimums = {}
     for Q in scenarios.scenarios_Q[:-1]:
-        for c, ascending in zip(cc, highest):
+        for ii, c in enumerate(cc):
             plotdata = DD[(Q, c)] - DD[(scenarios.Qref, c)]
             plotdata = plotdata[mapping.corridor_volgorde].reindex(mapping.corridor_volgorde, axis=0)
-            if (plotdata.max().max() > 1e6) or (plotdata.min().min() < -1e6) :
+            if unit_diff_plots[ii] == 'mln':
                 plotdata = plotdata / 1e6
                 c = c.replace('(', '(mln ')
-            elif (plotdata.max().max() > 1e3) or (plotdata.min().min() < -1e3):
+            elif unit_diff_plots[ii] == '1000':
                 plotdata = plotdata / 1e3
                 c = c.replace('(', '(x1000 ')
             if plotdata.abs().max().max() > 100:
@@ -729,17 +735,21 @@ def plot_corridor(D, figuredir=Path('.')):
             else:
                 format = '.1f'
 
+            if Q == scenarios.scenarios_Q[0]:
+                v_maximums[c] = plotdata.max().max()
+                v_minimums[c] = plotdata.min().min()
+
             f, ax = plt.subplots(figsize=(8, 7))
 
-            if ascending:
-                sns.heatmap(plotdata.T, cmap='Reds', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmin=0)
+            if ascending[ii]:
+                sns.heatmap(plotdata.T, cmap='Reds', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmin=0, vmax=v_maximums[c])
             else:
-                sns.heatmap(plotdata.T, cmap='Reds_r', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmax=0)
+                sns.heatmap(plotdata.T, cmap='Reds_r', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmax=0, vmin=v_minimums[c])
             plt.xlabel('Herkomst')
             plt.ylabel('Bestemming')
             plt.axhline(7, color='k', lw=1)
             plt.axvline(7, color='k', lw=1)
-            plt.title(f'Toename {c}')
+            plt.title(f'Toename {c} - {Q}')
             plotdata.to_csv(heatmapdir / f'Heatmap_change_{Q}_{c}.csv')
             plt.savefig(heatmapdir / f'Heatmap_change_{Q}_{c}.png', dpi=300, bbox_inches='tight')
             plt.close()
@@ -752,7 +762,10 @@ def plot_corridor_zones(D, figuredir=Path('.')):
     cc = ['Totale Vaarkosten (EUR)', 'Totale TonKM (TONKM)', 'Totale Reistijd (min)', 'Totale Vracht (ton)',
           'Totale TEU (-)', 'Aantal Vaarbewegingen (-)']
 
-    highest = [True, True, True, False, False, True]
+    ascending = [True, True, True, False, False, True]
+
+    unit_plots = ['mln', 'mln', 'mln', 'mln', '1000', '1000']
+    unit_diff_plots = ['mln', 'mln', 'mln', '1000', '1000', '1000']
 
     DD = {}
     for s in D.columns.levels[0]:
@@ -761,11 +774,11 @@ def plot_corridor_zones(D, figuredir=Path('.')):
     DD = pd.concat(DD, axis=1)
 
 
-    def plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Blues', vmin=None, vmax=None):
-        if (plotdata.max().max() > 1e6) or (plotdata.min().min() < -1e6):
+    def plot_heatmap_corridor(plotdata, c, unit, figsize=(15, 12), cmap='Blues', vmin=None, vmax=None):
+        if unit == 'mln':
             plotdata = plotdata / 1e6
             c = c.replace('(', '(mln ')
-        elif (plotdata.max().max() > 1e3) or (plotdata.min().min() < -1e3):
+        elif unit == '1000':
             plotdata = plotdata / 1e3
             c = c.replace('(', '(x1000 ')
         if plotdata.abs().max().max() > 100:
@@ -777,9 +790,9 @@ def plot_corridor_zones(D, figuredir=Path('.')):
         sns.heatmap(plotdata.T, cmap=cmap, annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmin=vmin, vmax=vmax)
         plt.xlabel('Herkomst')
         plt.ylabel('Bestemming')
-        plt.title(c)
+        plt.title(f'{c} - {scenarios.Qref}')
 
-    for c, ascending in zip(cc, highest):
+    for ii, c in enumerate(cc):
 
         plotdata = DD[(scenarios.Qref, c)]
         plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde,
@@ -790,7 +803,7 @@ def plot_corridor_zones(D, figuredir=Path('.')):
             plotdata.sum(axis=1) > plotdata.sum(axis=1).sort_values().iloc[-30],
             plotdata.sum(axis=0) > plotdata.sum(axis=0).sort_values().iloc[-30]]
 
-        plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Blues')
+        plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Blues', unit=unit_plots[ii])
         plotdata.to_csv(heatmapdir / f'Heatmap_zones_{c}.csv')
         plt.savefig(heatmapdir / f'Heatmap_zones_{c}.png', dpi=300, bbox_inches='tight')
         plt.close()
@@ -801,11 +814,14 @@ def plot_corridor_zones(D, figuredir=Path('.')):
                                     fill_value=0)
         plotdata = plotdata.loc[plotdata.sum(axis=1) > 0, plotdata.sum(axis=0) > 0]
 
-        plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Blues')
+        plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Blues', unit=unit_plots[ii])
         plotdata.to_csv(heatmapdir / f'Heatmap_zonesL_{c}.csv')
         plt.savefig(heatmapdir / f'Heatmap_zonesL_{c}.png', dpi=300, bbox_inches='tight')
         plt.close()
 
+        # Get maximum in first loop
+        v_maximums = {}
+        v_minimums = {}
         for Q in scenarios.scenarios_Q[:-1]:
             # Make plot of the top 30 zones
             plotdata = DD[(Q, c)] - DD[(scenarios.Qref, c)]
@@ -813,33 +829,48 @@ def plot_corridor_zones(D, figuredir=Path('.')):
                                         columns=mapping.basgoedzone_country_volgorde,
                                         fill_value=0)
 
-            if ascending:
+            if Q == scenarios.scenarios_Q[0]:
+                v_maximums[c] = plotdata.max().max()
+                v_minimums[c] = plotdata.min().min()
+
+            if ascending[ii]:
                 plotdata = plotdata.loc[
                     plotdata.sum(axis=1) > plotdata.sum(axis=1).sort_values().iloc[-30],
                     plotdata.sum(axis=0) > plotdata.sum(axis=0).sort_values().iloc[-30]]
-                plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds', vmin=0)
+                plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds', vmin=0, unit=unit_diff_plots[ii], vmax=v_maximums[c])
             else:
                 plotdata = plotdata.loc[
                     plotdata.sum(axis=1) < plotdata.sum(axis=1).sort_values(ascending=False).iloc[-30],
                     plotdata.sum(axis=0) < plotdata.sum(axis=0).sort_values(ascending=False).iloc[-30]]
-                plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds_r', vmax=0)
+                plot_heatmap_corridor(plotdata, c, figsize=(15, 12), cmap='Reds_r', vmax=0, unit=unit_diff_plots[ii], vmin=v_minimums[c])
 
+            plt.title(f'Toename {c} - {Q}')
             plotdata.to_csv(heatmapdir / f'Heatmap_zones_change_{Q}_{c}.csv')
             plt.savefig(heatmapdir / f'Heatmap_zones_change_{Q}_{c}.png', dpi=300, bbox_inches='tight')
             plt.close()
 
+        # Get maximum in first loop
+        v_maximums = {}
+        v_minimums = {}
+        for Q in scenarios.scenarios_Q[:-1]:
             # Make plot of all non-zero zones
             plotdata = DD[(Q, c)] - DD[(scenarios.Qref, c)]
             plotdata = plotdata.reindex(index=mapping.basgoedzone_country_volgorde,
                                         columns=mapping.basgoedzone_country_volgorde,
                                         fill_value=0)
-            if ascending:
+
+            if Q == scenarios.scenarios_Q[0]:
+                v_maximums[c] = plotdata.max().max()
+                v_minimums[c] = plotdata.min().min()
+
+            if ascending[ii]:
                 plotdata = plotdata.loc[plotdata.sum(axis=1) != 0, plotdata.sum(axis=0) != 0]
-                plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds', vmin=0)
+                plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds', vmin=0, unit=unit_diff_plots[ii], vmax=v_maximums[c])
             else:
                 plotdata = plotdata.loc[plotdata.sum(axis=1) != 0, plotdata.sum(axis=0) != 0]
-                plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds_r', vmax=0)
+                plot_heatmap_corridor(plotdata, c, figsize=(30, 25), cmap='Reds_r', vmax=0, unit=unit_diff_plots[ii], vmin=v_minimums[c])
 
+            plt.title(f'Toename {c} - {Q}')
             plotdata.to_csv(heatmapdir / f'Heatmap_zonesL_change_{Q}_{c}.csv')
             plt.savefig(heatmapdir / f'Heatmap_zonesL_change_{Q}_{c}.png', dpi=300, bbox_inches='tight')
             plt.close()
