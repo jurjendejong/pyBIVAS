@@ -145,10 +145,15 @@ class increase_empty_trips:
         REF = REF.sum().unstack(level=[1, 0]).sort_index(axis=1)
         Q = Q.sum().unstack(level=[1, 0]).sort_index(axis=1)
 
+        # Drop empty vessels, and sum for all other ladingtypes
+        REF = REF.drop('Leeg', axis=1, level=1).sum(axis=1, level=0)
+        Q = Q.drop('Leeg', axis=1, level=1).sum(axis=1, level=0)
+
+        # Drop all zeros (to prevent infinites, and get nans instead)
+        REF = REF[REF > 0]
+
         # Relatieve toename van alle niet-lege schepen
-        relatieve_toename = Q.drop('Leeg', axis=1, level=1).sum(axis=1, level=0) / REF.drop('Leeg', axis=1,
-                                                                                            level=1).sum(
-            axis=1, level=0)
+        relatieve_toename = Q / REF
         relatieve_toename = relatieve_toename.fillna(1)
 
         return relatieve_toename
