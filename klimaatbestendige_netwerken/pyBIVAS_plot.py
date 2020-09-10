@@ -37,7 +37,7 @@ class pyBIVAS_plot(pyBIVAS):
         'Maas (Oost-West)': 7523,
         'Maasroute': 9166,
         'Julianakanaal': 8710,
-        'Schelde-Rijnkanaal': 8387,
+        'Schelde-Rijnverbinding': 8387,
         'Betuwepand (ARK)': 6853,
         'Amsterdam-Rijnkanaal': 1645,
         'Merwedekanaal': 6330,
