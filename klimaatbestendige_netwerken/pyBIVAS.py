@@ -950,8 +950,12 @@ class pyBIVAS:
                 GROUP BY "Days"
                 LIMIT 0, 1
                 """
-        label = self.sql(sql).iloc[0, 0]
-        label = label.replace('/', '-')
+        label = self.sql(sql)
+        if len(label) == 0:
+            label = ''
+        else:
+            label = label.iloc[0, 0]
+            label = label.replace('/', '-')
         return label
 
     """
@@ -992,6 +996,7 @@ class pyBIVAS:
         arcs['geometry'] = arcs.apply(lambda z: LineString(
             [(z.X1, z.Y1), (z.X2, z.Y2)]), axis=1)
         arcsgpd = geopandas.GeoDataFrame(arcs)
+        arcsgpd.drop(['BranchSetId'], axis=1, inplace=True)
 
         if outputfileshape:
             arcsgpd.reset_index().to_file(outputfileshape, driver='GeoJSON')
@@ -999,7 +1004,7 @@ class pyBIVAS:
         self.arcs = arcsgpd
         return self.arcs
 
-    def network_nodes(self, outputfile=None):
+    def network_nodes(self, outputfile=None, include_names=False):
         """Export all Nodes in BIVAS to geojsonfile"""
 
         sql = """
@@ -1013,8 +1018,14 @@ class pyBIVAS:
             lambda z: Point(z.XCoordinate, z.YCoordinate), axis=1)
 
         nodes = geopandas.GeoDataFrame(nodes)
+        nodes.drop(['BranchSetId', 'Id', 'BranchID'], axis=1, inplace=True)
+
+        if include_names:
+            labels = ['{}_{}'.format(nodeID, self.node_label(nodeID)) for nodeID in nodes.index]
+            nodes['node_label'] = labels
+
         if outputfile:
-            nodes.to_file(outputfile, driver='GeoJSON')
+            nodes.reset_index().to_file(outputfile, driver='GeoJSON')
 
         self.nodes = nodes
         return self.nodes
