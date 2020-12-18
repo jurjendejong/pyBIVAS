@@ -717,6 +717,7 @@ def plot_corridor(D, figuredir=Path('.')):
         plt.savefig(heatmapdir / f'Heatmap_{c}.png', dpi=300, bbox_inches='tight')
         plt.close()
 
+    # Absolute change
     # Get maximum in first loop
     v_maximums = {}
     v_minimums = {}
@@ -753,7 +754,37 @@ def plot_corridor(D, figuredir=Path('.')):
             plotdata.to_csv(heatmapdir / f'Heatmap_change_{Q}_{c}.csv')
             plt.savefig(heatmapdir / f'Heatmap_change_{Q}_{c}.png', dpi=300, bbox_inches='tight')
             plt.close()
+    
+    
+    # Relative change
+    # Get maximum in first loop
+    v_maximums = {}
+    v_minimums = {}
+    for Q in scenarios.scenarios_Q[:-1]:
+        for ii, c in enumerate(cc):
+            plotdata = (DD[(Q, c)] - DD[(scenarios.Qref, c)]) / DD[(scenarios.Qref, c)]
+            plotdata = plotdata[mapping.corridor_volgorde].reindex(mapping.corridor_volgorde, axis=0)
+            
+            format = '.0%'
+            
+            if Q == scenarios.scenarios_Q[0]:
+                v_maximums[c] = plotdata.max().max()
+                v_minimums[c] = plotdata.min().min()
 
+            f, ax = plt.subplots(figsize=(8, 7))
+
+            if ascending[ii]:
+                sns.heatmap(plotdata.T, cmap='Purples', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmin=0, vmax=v_maximums[c])
+            else:
+                sns.heatmap(plotdata.T, cmap='Purples_r', annot=True, fmt=format, ax=ax, norm=SymLogNorm(1), cbar=False, vmax=0, vmin=v_minimums[c])
+            plt.xlabel('Herkomst')
+            plt.ylabel('Bestemming')
+            plt.axhline(7, color='k', lw=1)
+            plt.axvline(7, color='k', lw=1)
+            plt.title(f'Toename {c} - {Q}')
+            plotdata.to_csv(heatmapdir / f'Heatmap_relativechange_{Q}_{c}.csv')
+            plt.savefig(heatmapdir / f'Heatmap_relativechange_{Q}_{c}.png', dpi=300, bbox_inches='tight')
+            plt.close()
 
 def plot_corridor_zones(D, figuredir=Path('.')):
     heatmapdir = figuredir / 'heatmaps'
