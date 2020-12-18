@@ -1170,6 +1170,43 @@ class pyBIVAS:
         countingPoints = countingPoints.join(arcs, how='left', on='ArcID', rsuffix='_arcs')
         return countingPoints
 
+    def countingpoint_details(self, referenceSetId, countingPointName, trafficScenarioId):
+        """
+        Export all data for given countingpoint
+
+        :param referenceSetId:
+        :param countingPointName:
+        :param trafficScenarioId:
+        :return:
+        """
+
+        sql = f"""
+        SELECT
+            cemt_class.Description AS "CEMT-klasse",
+            ship_types.Label AS Scheepvaartklasse,
+            directions.Label AS Vaarrichting,
+            trips.*
+        FROM reference_trip_set
+            LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
+            LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
+            LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+            LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+            LEFT JOIN directions on counting_points.DirectionID == directions.ID
+        WHERE ReferenceSetID = {referenceSetId}
+            AND counting_points.Name = "{countingPointName}"
+            AND trips.TrafficScenarioID = {trafficScenarioId}
+            AND trips.NumberOfTrips > 0
+        """
+        df = self.sql(sql)
+        df.set_index('ID', inplace=True)
+
+        df['DateTime'] = pd.to_datetime(df['DateTime'])
+        df['Vaarrichting'] = df['Vaarrichting'].replace(to_replace=self.directions_dutch)
+
+        return df
+
+
+
     def countingpoint_timeseries(self, referenceSetId, countingPointName, trafficScenarioId, pivot='Vaarrichting',
                                  param="Aantal Vaarbewegingen (-)"):
         """
@@ -1256,7 +1293,7 @@ class pyBIVAS:
 
         df = df[param]
 
-        # df = df.replace({0: np.nan}) add his to also exclude all empty vessels when processing vracht
+        # df = df.replace({0: np.nan}) add this to also exclude all empty vessels when processing vracht
 
         if pivot == 'Scheepvaartklasse':
             ordered_columns = self.shiptypes()['Label']
