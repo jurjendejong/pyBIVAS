@@ -392,9 +392,9 @@ class pyBIVAS:
         if include_all_columns:
             df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
             C_w = 0.9 # could also be received from database, but it's constant anyway
-            df['TPMCI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
-            df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPMCI']*100)
-            df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPMCI']*100)
+            df['TPCMI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
+            df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPCMI']*100)
+            df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPCMI']*100)
             df['Totale Vaarkosten per TonKM'] = df['Totale Vaarkosten (EUR)'] / df['Totale TonKM (TONKM)']
 
 
@@ -479,9 +479,9 @@ class pyBIVAS:
 
         routestats['Beladingsgraad'] = routestats['TotalWeight__t'] / routestats['LoadCapacity__t']
         # C_w = 0.9 # could also be received from database, but it's constant anyway
-        # routestats['TPMCI'] = 0.01 * routestats['Length__m'] * routestats['Width__m'] * C_w
-        # routestats['Ledige_diepgang'] = routestats['Depth__m'] - routestats['TotalWeight__t'] / (routestats['TPMCI']*100)
-        # routestats['Maximale_diepgang'] = routestats['Depth__m'] + (routestats['LoadCapacity__t'] - routestats['TotalWeight__t']) / (routestats['TPMCI']*100)
+        # routestats['TPCMI'] = 0.01 * routestats['Length__m'] * routestats['Width__m'] * C_w
+        # routestats['Ledige_diepgang'] = routestats['Depth__m'] - routestats['TotalWeight__t'] / (routestats['TPCMI']*100)
+        # routestats['Maximale_diepgang'] = routestats['Depth__m'] + (routestats['LoadCapacity__t'] - routestats['TotalWeight__t']) / (routestats['TPCMI']*100)
         # routestats['Totale Vaarkosten per TonKM'] = routestats['Totale Vaarkosten (EUR)'] / routestats['Totale TonKM (TONKM)']
 
         return routestats
@@ -695,9 +695,9 @@ class pyBIVAS:
         if extended:
             df['Beladingsgraad'] = df['TotalWeight__t'] / df['LoadCapacity__t']
             C_w = 0.9 # could also be received from database, but it's constant anyway
-            df['TPMCI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
-            df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPMCI']*100)
-            df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPMCI']*100)
+            df['TPCMI'] = 0.01 * df['Length__m'] * df['Width__m'] * C_w
+            df['Ledige_diepgang'] = df['Depth__m'] - df['TotalWeight__t'] / (df['TPCMI']*100)
+            df['Maximale_diepgang'] = df['Depth__m'] + (df['LoadCapacity__t'] - df['TotalWeight__t']) / (df['TPCMI']*100)
             df['Totale Vaarkosten per TonKM'] = df['Totale Vaarkosten (EUR)'] / df['Totale TonKM (TONKM)']
 
         if group_by == 'trips.ID':
@@ -1447,9 +1447,9 @@ class pyBIVAS:
         G = nx.from_pandas_edgelist(
             arcs, 'FromNodeID', 'ToNodeID', edge_attr=True)
         for nodeID, nodeValues in nodes.iterrows():
-            if nodeID in G.node:
-                G.node[nodeID]['X'] = nodeValues['XCoordinate']
-                G.node[nodeID]['Y'] = nodeValues['YCoordinate']
+            if nodeID in G.nodes:
+                G.nodes[nodeID]['X'] = nodeValues['XCoordinate']
+                G.nodes[nodeID]['Y'] = nodeValues['YCoordinate']
             else:
                 pass
                 print('Node {} is not connected to any edge'.format(nodeID))
