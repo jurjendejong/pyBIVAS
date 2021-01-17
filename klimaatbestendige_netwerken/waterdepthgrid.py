@@ -96,8 +96,8 @@ class WaterdepthGrid:
 
     def compute_width_depth_table(self):
         """
-        Multiple functions to compute properties of waterdepth and corresponding width for each crosssection
-        in the grid. It assumes that the grid is moved in n-direction
+        For each cross-section (n-row) compute a table of width by depth. This table can be used to determine the
+        depth for each possible width.
 
         :return:
         """
@@ -129,10 +129,13 @@ class WaterdepthGrid:
                                sideslope=0, depth_at_fullwidth=0,  # New params
                                ):
         """
+        For each cross section of the grid compute the depth
 
         :param channelwidth: Base width
         :param min_channelwidth: Minimum width when narrowing
         :param min_channel_depth: Only do narrowing if width gets lower than this depth
+        :param sideslope: Compute for fixed width, of for variable width with given side close (from depth_at_full_width)
+        :param depth_at_fullwidth: Goes with param sideslope
         :return:
         """
         logging.info(f'Computing depth per n-row')
@@ -141,7 +144,7 @@ class WaterdepthGrid:
         channel_width = {}
         for n_row, ZW_table in self.ZW_table.items():
 
-            if sideslope == 0: # Old mode
+            if sideslope == 0:  # Old mode
                 depth_fullwidth = np.interp(channelwidth, ZW_table['W'][::-1], ZW_table['Z'][::-1])
                 if depth_fullwidth > min_channel_depth:
                     width_n = channelwidth
