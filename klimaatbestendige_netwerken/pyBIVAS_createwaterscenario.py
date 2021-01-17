@@ -59,13 +59,22 @@ class CreateWaterScenario:
         self.BIVAS_nodes = self.BIVAS.network_nodes()
 
     def create_mapping(self, bivas_reaches, sobek_reaches):
+        """
+        Within a subset of reaches in BIVAS and SOBEK, compute the closest SOBEK points to each BIVAS-arc
+
+        (reminder: SOBEK-results are only used for flow velocity (and water level/discharge). The grid is used for the
+        depth)
+
+        """
         logging.info('Creating koppeling')
         koppeling = []
         for reach, (node_start, node_end) in bivas_reaches.items():
             logging.info(f'Branch: {reach}')
+            # Select BIVAS arcs  between two given arcs
             _, bivas_arcs = self.shortestpath(self.BIVAS_networkx, node_start, node_end, weight_col='Length__m',
                                               edge_name='ID')
 
+            # Select SOBEK branches between two given nodes
             SOBEK_node_start, SOBEK_node_end = sobek_reaches[reach]
 
             _, sobek_branches = self.shortestpath(self.sobek_networkx, SOBEK_node_start, SOBEK_node_end,
@@ -78,6 +87,7 @@ class CreateWaterScenario:
             reachseg_subset = self.reachseg[self.reachseg['branchname'].isin(sobek_branches)]
             reachseg_subset_coordinates = reachseg_subset[['x_coordinate', 'y_coordinate']].apply(tuple, axis=1)
 
+            # For each BIVAS-arc, get closest gridpoint and reachsegment
             for arc in bivas_arcs:
                 BIVAS_arc = self.BIVAS_arcs.loc[arc]
                 bivas_arcs_center = tuple(BIVAS_arc[['XM', 'YM']])
@@ -114,6 +124,10 @@ class CreateWaterScenario:
         self.koppeling = pd.read_csv(koppeling_csv)
 
     def waterscenario_from_mapping(self):
+        """
+        Get SOBEK information (water level, discharge, flow velocity) based on the mapping
+
+        """
         logging.info('Apply mapping')
         # Use koppeling
 
@@ -144,6 +158,10 @@ class CreateWaterScenario:
         return self.waterscenario
 
     def load_waterdepthgrids(self, gridfiles, waterdepth):
+        """
+        Load water depth grids using the module waterdepthgrid.py
+
+        """
         logging.info('Loading and processing waterlevel grids')
 
         assert gridfiles.keys() == waterdepth.keys(), 'Should have equal keys'
@@ -162,6 +180,8 @@ class CreateWaterScenario:
 
     def waterdepth_from_grids(self, sections, add_extra_columns=True, manual_points=None):
         """
+
+        Compute the lowest waterdepth for a reach from the water depth grids
 
         :param sections: dict with structure {branchname: {point_start, point_end, channel_width, depth_at_fullwidth, sideslope, grid}}
         :param add_extra_columns: Boleaan. Add additional columns to waterscenario file
@@ -186,7 +206,7 @@ class CreateWaterScenario:
                     sideslope=section['sideslope']
                 )
 
-            # Find current reach
+            # Select current reach in the grid
             ii_start = self.nearest_df_row(df_depth, section['point_start'])
             ii_end = self.nearest_df_row(df_depth, section['point_end'])
             reach = df_depth.loc[ii_start: ii_end].copy()
