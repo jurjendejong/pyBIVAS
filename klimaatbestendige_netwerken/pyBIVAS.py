@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 try:
-    import geopandas
     from shapely.geometry import Point, LineString
+    import geopandas
 except:
-    logger.warning('Loading of geopandas/shapely failed. Geometric functions will not work')
+    logger.warning('Loading of shapely/geopandas failed. Geometric functions will not work')
 
 
 class pyBIVAS:
@@ -993,13 +993,17 @@ class pyBIVAS:
         if outputfilecsv:
             arcs.to_csv(outputfilecsv)
 
-        arcs['geometry'] = arcs.apply(lambda z: LineString(
-            [(z.X1, z.Y1), (z.X2, z.Y2)]), axis=1)
-        arcsgpd = geopandas.GeoDataFrame(arcs)
-        arcsgpd.drop(['BranchSetId'], axis=1, inplace=True)
+        try: 
+            arcs['geometry'] = arcs.apply(lambda z: LineString(
+                [(z.X1, z.Y1), (z.X2, z.Y2)]), axis=1)
+            arcsgpd = geopandas.GeoDataFrame(arcs)
+            arcsgpd.drop(['BranchSetId'], axis=1, inplace=True)
 
-        if outputfileshape:
-            arcsgpd.reset_index().to_file(outputfileshape, driver='GeoJSON')
+            if outputfileshape:
+                arcsgpd.reset_index().to_file(outputfileshape, driver='GeoJSON')
+        except:
+            arcsgpd = pd.DataFrame(arcs)
+            arcsgpd.drop(['BranchSetId'], axis=1, inplace=True)
 
         self.arcs = arcsgpd
         return self.arcs
