@@ -1,5 +1,5 @@
 ===========================
-Klimaatbestendige Netwerken
+pyBIVAS
 ===========================
 
 .. image:: https://api.travis-ci.com/jurjendejong/pyBIVAS.svg
