@@ -954,11 +954,11 @@ class IVS90_analyse(pyBIVAS_plot):
         zones = self.zone_list()['Name']
         nodes = self.network_nodes().index
         years = self.traffic_scenarios.index
-        #
-        # for c in countingPoints['Name']:
-        #     for y in self.traffic_scenarios.index:
-        #         # self.plot_countingpoint_timeseries(c, y)
-        #         self.plot_countingpoint_timeseries(c, y, param="Totale Vracht (ton)")
+        
+        for c in countingPoints['Name']:
+            for y in self.traffic_scenarios.index:
+                # self.plot_countingpoint_timeseries(c, y)
+                self.plot_countingpoint_timeseries(c, y, param="Totale Vracht (ton)")
 
 
         for c in countingPoints['Name']:
@@ -969,37 +969,37 @@ class IVS90_analyse(pyBIVAS_plot):
                             self.plot_countingpoint_timeseries_weekly(c, y, param=param, opdeling=opdeling, relatief=relatief)
 
 
-        #
-        # for c in countingPoints['Name']:
-        #     for y in self.traffic_scenarios.index:
-        #         self.plot_countingpoint_piechart_CEMTclasses(c, y)
-        #
-        # for c in countingPoints['Name']:
-        #     self.plot_countingpoint_montlytimeseries_yearlychanges(c)
-        #
-        # for c in countingPoints['Name']:
-        #     self.plot_countingpoint_YearlyChangesCEMT(c)
-        #
-        # for y in years:
-        #     self.export_node_stats_shapefile(jaar=y)
-        #
-        # for z in zones:
-        #     for y in years:
-        #         self.plot_zone_timeseries(jaar=y, zone_name=z)
+        
+        for c in countingPoints['Name']:
+            for y in self.traffic_scenarios.index:
+                self.plot_countingpoint_piechart_CEMTclasses(c, y)
+        
+        for c in countingPoints['Name']:
+            self.plot_countingpoint_montlytimeseries_yearlychanges(c)
+        
+        for c in countingPoints['Name']:
+            self.plot_countingpoint_YearlyChangesCEMT(c)
+        
+        for y in years:
+            self.export_node_stats_shapefile(jaar=y)
+        
+        for z in zones:
+            for y in years:
+                self.plot_zone_timeseries(jaar=y, zone_name=z)
 
-        # for z in zones:
-        #     for y in years:
-        #         self.plot_nodezone_piechart(groupby='NSTR', jaar=y, zone_name=z)
-        #         self.plot_nodezone_piechart(groupby='ship_types', jaar=y, zone_name=z)
-        #
-        # for n in nodes:
-        #     for y in years:
-        #         self.plot_node_timeseries(jaar=y, NodeID=n)
-        #
-        # for n in nodes:
-        #     for y in years:
-        #         self.plot_nodezone_piechart(groupby='NSTR', jaar=y, NodeID=n)
-        #         self.plot_nodezone_piechart(groupby='ship_types', jaar=y, NodeID=n)
-        #
+        for z in zones:
+            for y in years:
+                self.plot_nodezone_piechart(groupby='NSTR', jaar=y, zone_name=z)
+                self.plot_nodezone_piechart(groupby='ship_types', jaar=y, zone_name=z)
+        
+        for n in nodes:
+            for y in years:
+                self.plot_node_timeseries(jaar=y, NodeID=n)
+        
+        for n in nodes:
+            for y in years:
+                self.plot_nodezone_piechart(groupby='NSTR', jaar=y, NodeID=n)
+                self.plot_nodezone_piechart(groupby='ship_types', jaar=y, NodeID=n)
+        
 
 
