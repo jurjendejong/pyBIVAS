@@ -2,6 +2,10 @@
 pyBIVAS
 ===========================
 
+.. image:: https://api.travis-ci.com/jurjendejong/pyBIVAS.svg
+        :target: https://travis-ci.com/jurjendejong/pyBIVAS
+        :alt: Build status
+
 .. image:: https://readthedocs.org/projects/pybivas/badge/?version=latest
         :target: https://pybivas.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
