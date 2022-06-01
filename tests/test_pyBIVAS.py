@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for `klimaatbestendige_netwerken` package."""
+"""Tests for `pyBIVAS` package."""
 
 import unittest
 from pathlib import Path
@@ -9,7 +9,7 @@ from pyBIVAS.SQL import pyBIVAS
 
 
 class test_pyBIVAS(unittest.TestCase):
-    """Tests for `klimaatbestendige_netwerken` package."""
+    """Tests for `pyBIVAS` package."""
 
     skipSlowRuns = False
 

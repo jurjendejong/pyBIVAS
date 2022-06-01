@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = klimaatbestendige_netwerken
+SPHINXPROJ    = pyBIVAS
 SOURCEDIR     = .
 BUILDDIR      = _build
 

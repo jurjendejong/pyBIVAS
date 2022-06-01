@@ -32,7 +32,7 @@ install:
 
 script:
     - coverage run -m unittest discover -v
-#  - coverage run --source=klimaatbestendige_netwerken tests/test_pyFIS.py
+#  - coverage run --source=pyBIVAS tests/test_pyFIS.py
     - coverage report -m
 
 # Push the results back to codecov
@@ -54,5 +54,5 @@ after_success:
 #    secure: PLEASE_REPLACE_ME
 #  on:
 #    tags: true
-#    repo: jurjendejong/klimaatbestendige_netwerken
+#    repo: jurjendejong/pyBIVAS
 #    python: 3.7

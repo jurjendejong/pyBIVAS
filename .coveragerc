@@ -1,5 +1,5 @@
 [run]
-source = klimaatbestendige_netwerken
+source = pyBIVAS
 
 [report]
 exclude_lines =

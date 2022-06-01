@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=klimaatbestendige_netwerken
+set SPHINXPROJ=pyBIVAS
 
 if "%1" == "" goto help
 
