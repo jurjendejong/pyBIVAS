@@ -5,7 +5,7 @@
 
 import unittest
 from pathlib import Path
-from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
+from pyBIVAS.SQL import pyBIVAS
 
 
 class test_pyBIVAS(unittest.TestCase):

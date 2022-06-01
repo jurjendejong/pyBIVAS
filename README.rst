@@ -2,17 +2,9 @@
 pyBIVAS
 ===========================
 
-.. image:: https://api.travis-ci.com/jurjendejong/pyBIVAS.svg
-        :target: https://travis-ci.com/jurjendejong/pyBIVAS
-        :alt: Build status
-
-.. image:: https://readthedocs.org/projects/pyBIVAS/badge/?version=latest
-        :target: https://pyBIVAS.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/pybivas/badge/?version=latest
+        :target: https://pybivas.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
-
-.. image:: https://codecov.io/gh/jurjendejong/pyBIVAS/branch/master/graph/badge.svg
-        :target: https://codecov.io/gh/jurjendejong/pyBIVAS
-        :alt: Status code coverage
 
 This module provides various scripts to work with the software BIVAS by Charta Software (and Rijkswaterstaat). This software is used for network analyses of inland shipping. The module contains functions for specific queries to the BIVAS SQL-database and an API to modify and run simulations. 
 
@@ -32,7 +24,7 @@ Features
 How to install
 --------------
 
-pip install -e .
+    pip install -e .
 
 Credits
 -------

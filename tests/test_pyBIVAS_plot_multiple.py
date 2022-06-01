@@ -1,6 +1,6 @@
 from unittest import TestCase
-from klimaatbestendige_netwerken.pyBIVAS_plot_multiple import pyBIVAS_plot_compare
-from klimaatbestendige_netwerken.pyBIVAS_plot import pyBIVAS_plot
+from pyBIVAS.plot_multiple import pyBIVAS_plot_compare
+from pyBIVAS.plot import pyBIVAS_plot
 from pathlib import Path
 
 

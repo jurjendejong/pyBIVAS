@@ -1,6 +1,7 @@
 from unittest import TestCase
-from klimaatbestendige_netwerken.pyBIVAS_plot import pyBIVAS_plot as pyBIVAS
-from klimaatbestendige_netwerken.pyBIVAS_plot import IVS90_analyse
+
+from pyBIVAS.plot import pyBIVAS_plot as pyBIVAS
+from pyBIVAS.plot import IVS90_analyse
 from pathlib import Path
 
 
