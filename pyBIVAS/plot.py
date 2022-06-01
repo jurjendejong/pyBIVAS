@@ -2,7 +2,7 @@
 This function contains generic plotting functions to go with the module pyBIVAS
 """
 
-from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
+from pyBIVAS.SQL import pyBIVAS
 
 import matplotlib.pyplot as plt
 from pathlib import Path

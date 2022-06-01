@@ -29,6 +29,10 @@ Features
 * Advanced SQL-queries
 * Routines for running many scenario's
 
+How to install
+--------------
+
+pip install -e .
 
 Credits
 -------

@@ -15,8 +15,8 @@ import requests
 import xml.dom.minidom
 import logging
 from datetime import datetime
-from klimaatbestendige_netwerken.pyBIVAS import pyBIVAS
-from klimaatbestendige_netwerken.pyBIVAS_API import BIVAS_API
+from pyBIVAS.SQL import pyBIVAS
+from pyBIVAS.API import BIVAS_API
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

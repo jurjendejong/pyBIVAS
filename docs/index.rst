@@ -6,8 +6,10 @@ Welcome to Klimaatbestendige Netwerken's documentation!
    :caption: Contents:
 
    readme
-   pyBIVAS
-   pyFIS
+   SQL
+   API
+   runner
+   
 
 
 Indices and tables

@@ -1,4 +1,4 @@
-from klimaatbestendige_netwerken.pyBIVAS_plot import pyBIVAS_plot as pyBIVAS
+from pyBIVAS.plot import pyBIVAS_plot as pyBIVAS
 import pandas as pd
 import geopandas
 import gc

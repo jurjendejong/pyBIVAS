@@ -16,3 +16,4 @@ xlrd >= 1.0.0
 seaborn>=0.9.0
 jupyter
 jupyterlab
+xmltodict

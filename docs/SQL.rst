@@ -1,10 +1,10 @@
-=======
-pyBIVAS
-=======
+===
+SQL
+===
 
 To use pyBIVAS in a project::
 	
-    from klimaatbestendige_netwerken import pyBIVAS
+    from pyBIVAS.SQL import pyBIVAS
 
 The scripts allow for connection to a database service (MariaDB) or a database file (SQLite). In this example we assume the latter::
 
