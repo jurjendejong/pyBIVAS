@@ -51,7 +51,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr .pytest_cache
 
 lint: ## check style with flake8
-	flake8 klimaatbestendige_netwerken tests
+	flake8 pyBIVAS tests
 
 test: ## run tests quickly with the default Python
 	python setup.py test
@@ -60,15 +60,15 @@ test-all: ## run tests on every Python version with tox
 	tox
 
 coverage: ## check code coverage quickly with the default Python
-	coverage run --source klimaatbestendige_netwerken setup.py test
+	coverage run --source pyBIVAS setup.py test
 	coverage report -m
 	coverage html
 	$(BROWSER) htmlcov/index.html
 
 docs: ## generate Sphinx HTML documentation, including API docs
-	rm -f docs/klimaatbestendige_netwerken.rst
+	rm -f docs/pyBIVAS.rst
 	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ klimaatbestendige_netwerken
+	sphinx-apidoc -o docs/ pyBIVAS
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 	$(BROWSER) docs/_build/html/index.html
