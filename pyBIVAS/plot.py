@@ -552,7 +552,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         # Query data
         df = self.countingpoint_timeseries(countingPointName, referenceSetId, trafficScenarioId, param=param)
-        if (df is None) | (not len(df)):
+        if df is None:
             return 'No data'
 
         # Plot data
@@ -684,7 +684,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         # Query data
         df = self.countingpoint_CEMT_klasse(countingPointName, referenceSetId, trafficScenarioId)
-        if not len(df):
+        if df is None:
             return 'No data'
 
         # Plot data
@@ -729,7 +729,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
             dfs[jaar] = df
 
-        if not len(dfs):
+        if df is None:
             return 'No data'
 
         dfs = pd.concat(dfs, axis=1)
@@ -767,7 +767,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
             dfs[jaar] = df
 
-        if not len(dfs):
+        if df is None:
             return 'No data'
 
         dfs = pd.concat(dfs, axis=1, sort=False)
@@ -925,7 +925,7 @@ class IVS90_analyse(pyBIVAS_plot):
                                       groupby_sort=groupby_sort, directions=directions)
             label = zone_name
 
-        if len(df)==0:
+        if df is None:
             return 'No data'
 
         # Plot
