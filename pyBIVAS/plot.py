@@ -552,7 +552,7 @@ class IVS90_analyse(pyBIVAS_plot):
 
         # Query data
         df = self.countingpoint_timeseries(countingPointName, referenceSetId, trafficScenarioId, param=param)
-        if not len(df):
+        if (df is None) | (not len(df)):
             return 'No data'
 
         # Plot data
