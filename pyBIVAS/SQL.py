@@ -1021,7 +1021,10 @@ class pyBIVAS:
         nodes['geometry'] = nodes.apply(
             lambda z: Point(z.XCoordinate, z.YCoordinate), axis=1)
 
-        nodes = geopandas.GeoDataFrame(nodes)
+        try:
+            nodes = geopandas.GeoDataFrame(nodes)
+        except:
+            nodes = pd.DataFrame(nodes)
         nodes.drop(['BranchSetId', 'Id', 'BranchID'], axis=1, inplace=True)
 
         if include_names:
@@ -1295,10 +1298,11 @@ class pyBIVAS:
         SUM(trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
         SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)"
         FROM reference_trip_set
-        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-        LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
+        LEFT JOIN trips ON reference_trip_set.Trip == trips.ID
+        LEFT JOIN counting_point_arcs ON reference_trip_set.Arc == counting_point_arcs.ArcID
+        LEFT JOIN counting_points ON counting_points.ID = counting_point_arcs.CountingPointID
         {sql_leftjoin}
-        WHERE ReferenceSetID = {referenceSetId}
+        WHERE ReferenceTripSet = {referenceSetId}
         AND counting_points.Name = "{countingPointName}"
         AND trips.TrafficScenarioID = {trafficScenarioId}
         AND trips.NumberOfTrips > 0
@@ -1581,4 +1585,109 @@ class pyBIVAS_v48(pyBIVAS):
         df['DateTime'] = pd.to_datetime(df['DateTime'])
         df['Vaarrichting'] = df['Vaarrichting'].replace(to_replace=self.directions_dutch)
 
+        return df
+
+
+    def countingpoint_timeseries(self, countingPointName, referenceSetId=None, trafficScenarioId=None, pivot='Vaarrichting',
+                                 param="Aantal Vaarbewegingen (-)"):
+        """
+        Create timeserie of all trips passing a countingpoint in the referenceset.
+        Possible to differentiate per direction, or have it combined
+
+        pivot: None, "Vaarrichting", "Bestemming", "Herkomst", "Scheepvaartklasse", "CEMT-klasse"
+        """
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+            
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
+
+        sql_select = 'DATE(trips.DateTime) AS "Days"'
+        sql_leftjoin = ''
+        sql_groupby = '"Days"'
+        sql_where = ''
+
+
+        if pivot == 'Vaarrichting':
+            sql_select += ', directions.Label AS Vaarrichting'
+            sql_groupby += ', counting_points.DirectionID'
+            sql_leftjoin += 'LEFT JOIN directions on counting_points.DirectionID == directions.ID'
+        elif pivot == 'Bestemming':
+            zone_definition_id = 9
+            sql_leftjoin += 'LEFT JOIN zone_node_mapping AS znm_Destination ON trips.DestinationTripEndPointNodeID = znm_Destination.NodeID '
+            sql_leftjoin += 'LEFT JOIN zones AS zones_destination ON znm_Destination.ZoneID = zones_destination.ID '
+            sql_groupby += ', Bestemming'
+            sql_select += ', zones_destination.Name AS Bestemming'
+            sql_where += f' AND zones_destination.ZoneDefinitionID = {zone_definition_id} AND znm_Destination.ZoneDefinitionID = {zone_definition_id}'
+        elif pivot == 'Herkomst':
+            zone_definition_id = 9
+            sql_leftjoin += 'LEFT JOIN zone_node_mapping AS znm_Origin ON trips.OriginTripEndPointNodeID = znm_Origin.NodeID '
+            sql_leftjoin += 'LEFT JOIN zones AS zones_origin ON znm_Origin.ZoneID = zones_origin.ID '
+            sql_groupby += ', Herkomst'
+            sql_select += ', zones_origin.Name AS Herkomst'
+            sql_where += f' AND zones_origin.ZoneDefinitionID = {zone_definition_id} AND znm_Origin.ZoneDefinitionID = {zone_definition_id}'
+        elif pivot == 'Scheepvaartklasse':
+            sql_select += f"""
+                 , ship_types.Label AS Scheepvaartklasse
+                 """
+            sql_leftjoin += f"""
+                 LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                 LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                 """
+            sql_groupby += ', Scheepvaartklasse'
+        elif pivot == 'CEMT-klasse':
+            sql_select += f"""
+                 , cemt_class.Description AS "CEMT-klasse"
+                 """
+            sql_leftjoin += f"""
+                 LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+                 LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+                 """
+            sql_groupby += ', "CEMT-klasse"'
+        else:
+            pass
+
+
+        sql = f"""
+        SELECT
+        {sql_select},
+        SUM(trips.NumberOfTrips) AS "Aantal Vaarbewegingen (-)",
+        SUM(trips.TotalWeight__t * trips.NumberOfTrips) AS "Totale Vracht (ton)"
+        FROM reference_trip_set
+        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
+        LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
+        {sql_leftjoin}
+        WHERE ReferenceSetID = {referenceSetId}
+        AND counting_points.Name = "{countingPointName}"
+        AND trips.TrafficScenarioID = {trafficScenarioId}
+        AND trips.NumberOfTrips > 0
+        {sql_where}
+        GROUP BY {sql_groupby}
+        """
+        df = self.sql(sql)
+
+        df['Days'] = pd.to_datetime(df['Days'])
+        df = df.set_index('Days')
+
+        # If not returning here, it will crash
+        if df.shape[0] == 0:
+            return None
+
+        if pivot is not None:
+            df = df.pivot(columns=pivot)
+            df.rename(mapper=self.directions_dutch, inplace=True, axis=1)
+
+        df = df[param]
+
+        # df = df.replace({0: np.nan}) add this to also exclude all empty vessels when processing vracht
+
+        if pivot == 'Scheepvaartklasse':
+            ordered_columns = self.shiptypes()['Label']
+            df = df.reindex(ordered_columns, axis=1).dropna(how='all', axis=1)
+        elif pivot == 'CEMT-klasse':
+            ordered_columns = self.CEMTclass()['Description']
+            df = df.reindex(ordered_columns, axis=1).dropna(how='all', axis=1)
+
+        fullyear = pd.date_range('01-01-{}'.format(df.index[0].year), '31-12-{}'.format(df.index[0].year))
+        df = df.reindex(fullyear, fill_value=0).fillna(0)
         return df
