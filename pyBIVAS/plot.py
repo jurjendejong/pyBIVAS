@@ -551,7 +551,7 @@ class IVS90_analyse(pyBIVAS_plot):
         countingPointName = telpunt
 
         # Query data
-        df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, param=param)
+        df = self.countingpoint_timeseries(countingPointName, referenceSetId, trafficScenarioId, param=param)
         if not len(df):
             return 'No data'
 
@@ -607,7 +607,7 @@ class IVS90_analyse(pyBIVAS_plot):
         countingPointName = telpunt
 
         # Query data
-        df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, param=param,
+        df = self.countingpoint_timeseries(countingPointName, referenceSetId, trafficScenarioId, param=param,
                                            pivot=opdeling)
         if df is None:
             return 'No data'
@@ -683,7 +683,7 @@ class IVS90_analyse(pyBIVAS_plot):
         countingPointName = telpunt
 
         # Query data
-        df = self.countingpoint_CEMT_klasse(referenceSetId, countingPointName, trafficScenarioId)
+        df = self.countingpoint_CEMT_klasse(countingPointName, referenceSetId, trafficScenarioId)
         if not len(df):
             return 'No data'
 
@@ -718,7 +718,7 @@ class IVS90_analyse(pyBIVAS_plot):
             countingPointName = telpunt
 
             # Query data
-            df = self.countingpoint_timeseries(referenceSetId, countingPointName, trafficScenarioId, pivot=None)
+            df = self.countingpoint_timeseries(countingPointName, referenceSetId, trafficScenarioId, pivot=None)
 
             if not len(df):
                 continue
@@ -761,7 +761,7 @@ class IVS90_analyse(pyBIVAS_plot):
             countingPointName = telpunt
 
             # Query data
-            df = self.countingpoint_CEMT_klasse(referenceSetId, countingPointName, trafficScenarioId)
+            df = self.countingpoint_CEMT_klasse(countingPointName, referenceSetId, trafficScenarioId)
             if not len(df):
                 continue
 

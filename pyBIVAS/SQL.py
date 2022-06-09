@@ -1174,15 +1174,32 @@ class pyBIVAS:
         countingPoints = countingPoints.join(arcs, how='left', on='ArcID', rsuffix='_arcs')
         return countingPoints
 
-    def countingpoint_details(self, referenceSetId, countingPointName, trafficScenarioId):
+    def countingpoint_details(self, ArcID=None, countingPointName=None, referenceSetId=None, trafficScenarioId=None):
         """
         Export all data for given countingpoint
+        Either specify ArcID or countintPointName
 
         :param referenceSetId:
         :param countingPointName:
         :param trafficScenarioId:
         :return:
         """
+        
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+            
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
+        
+        if ArcID is None:
+            sql =   f"""
+                        SELECT
+                        counting_point_arcs.ArcID AS ID
+                        FROM counting_points
+                        LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
+                        WHERE counting_points.Name = "{countingPointName}"
+                        """
+            ArcID = B.sql(sql).values[0, 0]
 
         sql = f"""
         SELECT
@@ -1191,13 +1208,14 @@ class pyBIVAS:
             directions.Label AS Vaarrichting,
             trips.*
         FROM reference_trip_set
-            LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
-            LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
+            LEFT JOIN trips ON reference_trip_set.Trip == trips.ID
             LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
             LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+            LEFT JOIN counting_point_arcs ON reference_trip_set.Arc == counting_point_arcs.ArcID
+            LEFT JOIN counting_points ON counting_points.ID = counting_point_arcs.CountingPointID
             LEFT JOIN directions on counting_points.DirectionID == directions.ID
-        WHERE ReferenceSetID = {referenceSetId}
-            AND counting_points.Name = "{countingPointName}"
+        WHERE ReferenceTripSet = {referenceSetId}
+            AND Arc = "{ArcID}"
             AND trips.TrafficScenarioID = {trafficScenarioId}
             AND trips.NumberOfTrips > 0
         """
@@ -1211,7 +1229,7 @@ class pyBIVAS:
 
 
 
-    def countingpoint_timeseries(self, referenceSetId, countingPointName, trafficScenarioId, pivot='Vaarrichting',
+    def countingpoint_timeseries(self, countingPointName, referenceSetId=None, trafficScenarioId=None, pivot='Vaarrichting',
                                  param="Aantal Vaarbewegingen (-)"):
         """
         Create timeserie of all trips passing a countingpoint in the referenceset.
@@ -1219,6 +1237,11 @@ class pyBIVAS:
 
         pivot: None, "Vaarrichting", "Bestemming", "Herkomst", "Scheepvaartklasse", "CEMT-klasse"
         """
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+            
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
 
         sql_select = 'DATE(trips.DateTime) AS "Days"'
         sql_leftjoin = ''
@@ -1310,10 +1333,17 @@ class pyBIVAS:
         df = df.reindex(fullyear, fill_value=0).fillna(0)
         return df
 
-    def countingpoint_CEMT_klasse(self, referenceSetId, countingPointName, trafficScenarioId):
+    def countingpoint_CEMT_klasse(self, countingPointName, referenceSetId=None, trafficScenarioId=None):
         """
         Get statistics on CEMT class at a counting point
         """
+        
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+            
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
+            
         sql = """
         SELECT
         count(*) AS nTrips,
@@ -1491,3 +1521,64 @@ class pyBIVAS:
         for name, nodes in pathnodes.items():
             _, pathedges[name] = self.networkx_findpath(nodes[0], nodes[1])
         return pathedges
+
+
+class pyBIVAS_v48(pyBIVAS):
+    """Backwards compatibility for version BIVAS 4.8"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    
+    def countingpoint_details(self, ArcID=None, countingPointName=None, referenceSetId=None, trafficScenarioId=None):
+        """
+        Export all data for given countingpoint
+        Either specify ArcID or countintPointName
+
+        :param referenceSetId:
+        :param countingPointName:
+        :param trafficScenarioId:
+        :return:
+        """
+        
+        if referenceSetId is None:
+            referenceSetId = self.ReferenceTripSetID
+            
+        if trafficScenarioId is None:
+            trafficScenarioId = self.trafficScenario
+        
+        if ArcID is None:
+            sql =   f"""
+                        SELECT
+                        counting_point_arcs.ArcID AS ID
+                        FROM counting_points
+                        LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
+                        WHERE counting_points.Name = "{countingPointName}"
+                        """
+            ArcID = B.sql(sql).values[0, 0]
+
+        sql = f"""
+        SELECT
+            cemt_class.Description AS "CEMT-klasse",
+            ship_types.Label AS Scheepvaartklasse,
+            directions.Label AS Vaarrichting,
+            trips.*
+        FROM reference_trip_set
+            LEFT JOIN trips ON reference_trip_set.TripID = trips.ID
+            LEFT JOIN counting_points ON reference_trip_set.CountingPointID = counting_points.ID
+            LEFT JOIN ship_types ON trips.ShipTypeID = ship_types.ID
+            LEFT JOIN cemt_class ON ship_types.CEMTTypeID = cemt_class.Id
+            LEFT JOIN directions on counting_points.DirectionID = directions.ID
+            LEFT JOIN counting_point_arcs ON reference_trip_set.CountingPointID = counting_point_arcs.CountingPointID
+        WHERE ReferenceSetID = {referenceSetId}
+            AND counting_point_arcs.ArcID = "{ArcID}"
+            AND trips.TrafficScenarioID = {trafficScenarioId}
+            AND trips.NumberOfTrips > 0
+        """
+        df = self.sql(sql)
+        df.set_index('ID', inplace=True)
+
+        df['DateTime'] = pd.to_datetime(df['DateTime'])
+        df['Vaarrichting'] = df['Vaarrichting'].replace(to_replace=self.directions_dutch)
+
+        return df
