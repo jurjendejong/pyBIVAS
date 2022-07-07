@@ -13,7 +13,7 @@ The scripts allow for connection to a database service (MariaDB) or a database f
 
 Get a list of the scenario's in the model and set the one you want to analyse::
 
-    BIVAS.sqlOverviewOfScenarios()
+    BIVAS.scenario_parameters()
     BIVAS.set_scenario(47)
 
 

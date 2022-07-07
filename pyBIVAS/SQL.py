@@ -399,7 +399,7 @@ class pyBIVAS:
 
 
         # Format dates
-        if group_by and 'Days' in group_by:
+        if 'Days' in df.columns:
             df['Days'] = pd.to_datetime(df['Days'])
 
         # TODO: Nog goede indexering (en volgorde) instellen
@@ -1202,7 +1202,7 @@ class pyBIVAS:
                         LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
                         WHERE counting_points.Name = "{countingPointName}"
                         """
-            ArcID = B.sql(sql).values[0, 0]
+            ArcID = self.B.sql(sql).values[0, 0]
 
         sql = f"""
         SELECT
@@ -1353,11 +1353,11 @@ class pyBIVAS:
         count(*) AS nTrips,
         cemt_class.Description AS CEMT_klasse
         FROM reference_trip_set
-        LEFT JOIN trips ON reference_trip_set.TripID == trips.ID
+        LEFT JOIN trips ON reference_trip_set.Trip == trips.ID
         LEFT JOIN counting_points ON reference_trip_set.CountingPointID == counting_points.ID
         LEFT JOIN ship_types ON trips.ShipTypeID == ship_types.ID
         LEFT JOIN cemt_class ON ship_types.CEMTTypeID == cemt_class.ID
-        WHERE ReferenceSetID = {}
+        WHERE ReferenceTripSet = {}
         AND counting_points.Name = "{}"
         AND trips.TrafficScenarioID = {}
         AND trips.NumberOfTrips > 0
@@ -1559,7 +1559,7 @@ class pyBIVAS_v48(pyBIVAS):
                         LEFT JOIN counting_point_arcs ON counting_points.ID = counting_point_arcs.CountingPointID
                         WHERE counting_points.Name = "{countingPointName}"
                         """
-            ArcID = B.sql(sql).values[0, 0]
+            ArcID = self.B.sql(sql).values[0, 0]
 
         sql = f"""
         SELECT
